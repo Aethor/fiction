@@ -162,9 +162,13 @@ def linearize_facts(
     print("linearizing facts...", end="")
     for subj, rel, obj, ts in facts:
         if rel in start_only_rels:
-            linearized_facts.append((subj, rel, obj, ts.split(":")[0]))
+            ts = ts.split(":")[0]
+            if ts != "":
+                linearized_facts.append((subj, rel, obj, ts))
         elif rel in end_only_rels:
-            linearized_facts.append((subj, rel, obj, ts.split(":")[-1]))
+            ts = ts.split(":")[-1]
+            if ts != "":
+                linearized_facts.append((subj, rel, obj, ts))
         elif not ":" in ts:
             linearized_facts.append((subj, rel, obj, ts))
         elif ts.endswith(":"):
@@ -180,7 +184,6 @@ def linearize_facts(
                 linearized_facts.append((subj, update_rel(rel, "end"), obj, end))
     print("done!")
 
-    assert len(linearized_facts) >= len(facts)
     return linearized_facts
 
 
