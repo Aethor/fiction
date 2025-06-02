@@ -201,6 +201,7 @@ def sample_new_fact(
     rel2id: Dict[str, int],
     ts2id: Dict[str, int],
     db_info: YagoDBInfo,
+    process_nb: int = 1,
 ) -> Optional[Fact]:
     rel_candidates: List[str] = []
     for rel in rel2id:
@@ -224,6 +225,7 @@ def sample_new_fact(
         entity2id,
         rel2id,
         ts2id,
+        process_nb=process_nb,
     )
     # transform each (obj, score) couple into fact
     obj_candidates = [
@@ -250,6 +252,7 @@ if __name__ == "__main__":
     parser.add_argument("-o", "--output-file", type=pl.Path)
     parser.add_argument("-e", "--year", type=int)
     parser.add_argument("-n", "--facts-per-day", type=int)
+    parser.add_argument("-p", "--process-nb", type=int, default=1)
     args = parser.parse_args()
 
     rules = load_rules(args.rules, args.rule_lengths)
@@ -292,6 +295,7 @@ if __name__ == "__main__":
                     rel2id,
                     ts2id,
                     db_info,
+                    process_nb=args.process_nb,
                 )
                 tries += 1
                 print(f".", end="", flush=True)
