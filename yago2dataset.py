@@ -1,10 +1,10 @@
-from typing import Literal, Tuple, List
+from typing import Literal
 import argparse, os, re
 from collections import Counter
 import pathlib as pl
 from fiction.utils import dump_facts, dump_json
 
-Fact = Tuple[str, str, str, str]
+Fact = tuple[str, str, str, str]
 
 
 class Date:
@@ -16,7 +16,7 @@ class Date:
     """
 
     @staticmethod
-    def parse_yyyymmdd(ts: str) -> Tuple[int, int, int]:
+    def parse_yyyymmdd(ts: str) -> tuple[int, int, int]:
         is_negative = False
         if ts.startswith("-"):
             ts = ts[1:]
@@ -96,7 +96,6 @@ def set_ts(ts: str, val: str, update: Literal["start", "end"]) -> str:
 def load_yago(
     path: pl.Path, relations: set[str], min_year: int, max_year: int
 ) -> set[Fact]:
-
     facts = {}  # { (subj, rel, obj) => ts }
     print("loading YAGO meta-facts...", end="")
     unparsable_ts_nb = 0
@@ -104,7 +103,6 @@ def load_yago(
         i = 0
 
         for line in f:
-
             if i % 1000000 == 0:
                 print(".", end="", flush=True)
             i += 1
@@ -152,17 +150,22 @@ def load_yago(
     return ts_facts
 
 
-def linearize_facts(facts: List[Fact]) -> List[Fact]:
-
+def linearize_facts(
+    facts: list[Fact], start_only_rels: set[str], end_only_rels: set[str]
+) -> list[Fact]:
     def update_rel(rel: str, bound: Literal["start", "end"]) -> str:
         prefix, raw_rel = rel.split(":")
-        return f"{prefix}:{bound}{raw_rel[0].upper()+raw_rel[1:]}"
+        return f"{prefix}:{bound}{raw_rel[0].upper() + raw_rel[1:]}"
 
     linearized_facts = []
 
     print("linearizing facts...", end="")
     for subj, rel, obj, ts in facts:
-        if not ":" in ts:
+        if rel in start_only_rels:
+            linearized_facts.append((subj, rel, obj, ts.split(":")[0]))
+        elif rel in end_only_rels:
+            linearized_facts.append((subj, rel, obj, ts.split(":")[-1]))
+        elif not ":" in ts:
             linearized_facts.append((subj, rel, obj, ts))
         elif ts.endswith(":"):
             linearized_facts.append((subj, update_rel(rel, "start"), obj, ts[:-1]))
@@ -181,9 +184,8 @@ def linearize_facts(facts: List[Fact]) -> List[Fact]:
     return linearized_facts
 
 
-def sparsity_filter(facts: List[Fact], threshold: int, depth: int = 0) -> List[Fact]:
-
-    print(f"reducing sparsity (round {depth+1})...", end="")
+def sparsity_filter(facts: list[Fact], threshold: int, depth: int = 0) -> list[Fact]:
+    print(f"reducing sparsity (round {depth + 1})...", end="")
     counter = Counter()
     for subj, _, obj, _ in facts:
         counter[subj] += 1
@@ -207,10 +209,11 @@ def sparsity_filter(facts: List[Fact], threshold: int, depth: int = 0) -> List[F
 
 
 if __name__ == "__main__":
-
     parser = argparse.ArgumentParser()
     parser.add_argument("--input-dir", "-i", type=pl.Path)
     parser.add_argument("--relations", "-r", default=set(), nargs="*")
+    parser.add_argument("--start-only-relations", "-a", default=set(), nargs="*")
+    parser.add_argument("--end-only-relations", "-e", default=set(), nargs="*")
     parser.add_argument("--output-dir", "-o", type=pl.Path)
     parser.add_argument("--min-year", "-miny", type=int, default=2024)
     parser.add_argument("--max-year", "-maxy", type=int, default=1925)
@@ -221,7 +224,9 @@ if __name__ == "__main__":
     relations = set(args.relations)
     facts = list(load_yago(args.input_dir, relations, args.min_year, args.max_year))
     if args.linearize:
-        facts = linearize_facts(facts)
+        facts = linearize_facts(
+            facts, args.start_only_relations, args.end_only_relations
+        )
         relations = set(f[1] for f in facts)
     facts = sparsity_filter(facts, args.sparsity_filter_threshold)
     print(f"found {len(facts)} facts for {len(relations)} relations.")
