@@ -92,11 +92,16 @@ def query(
 
     id2entity = {v: k for k, v in entity2id.items()}
     if process_nb == 1:
+        window = 0
         scores, _ = apply_rules(
             grapher.test_idx,
             rules,
             grapher,
-            store_edges(grapher.train_idx),
+            # This argument is only used in ra.get_window_edges. In
+            # that function, it is discarded unless window ==
+            # -1. Therefore, we optimize by not computing it here if
+            # not needed.
+            store_edges(grapher.train_idx) if window == -1 else None,
             score_12,
             20,  # top_k
             0,
@@ -105,7 +110,7 @@ def query(
             # a * confidence + (1 - a) temporal_distance(lambda)
             # where temporal_distance is e^{lambda * (max_walk_ts - query_ts)}
             [[0.1, 0.5]],
-            0,  # window
+            window,
         )
         answers = [[] for _ in range(len(queries))]
         for answer_i, scores in scores[0].items():
@@ -115,30 +120,35 @@ def query(
                 continue
         return answers
     else:
+        window = 0
         queries_nb = len(grapher.test_idx) // process_nb
         poutput = Parallel(n_jobs=process_nb)(
             delayed(apply_rules)(
                 grapher.test_idx,
                 rules,
                 grapher,
-                store_edges(grapher.train_idx),
+                # This argument is only used in ra.get_window_edges. In
+                # that function, it is discarded unless window ==
+                # -1. Therefore, we optimize by not computing it here if
+                # not needed.
+                store_edges(grapher.train_idx) if window == -1 else None,
                 score_12,
                 20,  # top_k
                 i,
                 queries_nb,
                 [[0.1, 0.5]],  # args for score_12
-                0,  # window
+                window,  # window
             )
             for i in range(process_nb)
         )
 
-    answers = [[] for _ in range(len(queries))]
-    for i in range(process_nb):
-        for answer_i, scores in poutput[i][0][0].items():
-            try:
-                answers[answer_i] = [(id2entity[k], v) for k, v in scores.items()]
-            except IndexError:
-                continue
+        answers = [[] for _ in range(len(queries))]
+        for i in range(process_nb):
+            for answer_i, scores in poutput[i][0][0].items():
+                try:
+                    answers[answer_i] = [(id2entity[k], v) for k, v in scores.items()]
+                except IndexError:
+                    continue
 
     return answers
 

@@ -179,14 +179,14 @@ def store_neighbors(quads):
     """
 
     neighbors = dict()
-    nodes = list(set(quads[:, 0]))
+    nodes = set(quads[:, 0])
     for node in nodes:
         neighbors[node] = quads[quads[:, 0] == node]
 
     return neighbors
 
 
-def store_edges(quads):
+def store_edges(quads: np.ndarray) -> dict:
     """
     Store all edges for each relation.
 
@@ -198,7 +198,7 @@ def store_edges(quads):
     """
 
     edges = dict()
-    relations = list(set(quads[:, 1]))
+    relations = set(quads[:, 1])
     for rel in relations:
         edges[rel] = quads[quads[:, 1] == rel]
 
