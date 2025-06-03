@@ -216,14 +216,23 @@ def sample_new_facts(
 ) -> list[Fact]:
     assert max_tries_nb >= 1
 
-    print(f"generating facts for {ts}...")
+    print(f"generating {facts_per_day} facts for {ts}...")
+
+    # we will try to generate all facts in parallel. It's better to do
+    # it in a single pass: otherwise, we have to copy fact_dataset in
+    # each worker a second time. Therefore, we add a few more queries
+    # to perform. This is OK since we will exit early if all facts are
+    # generated anyway.
+    margin = 0
+    if parallel.n_jobs > 1:
+        margin = int(1 / 3 * facts_per_day)
 
     subj_entities = fact_dataset.subj_entities()
 
     new_facts = []
     tries_nb = 0
     while len(new_facts) < facts_per_day or tries_nb > max_tries_nb:
-        to_gen_nb = facts_per_day - len(new_facts)
+        to_gen_nb = facts_per_day - len(new_facts) + margin
         subjects = random.sample(list(subj_entities), k=to_gen_nb)
 
         # We have to cut processing in 3 steps. Steps 1 and 3 cant be
@@ -238,7 +247,7 @@ def sample_new_facts(
             delayed(query)(subject_queries[i], rules, fact_dataset)
             for i in range(to_gen_nb)
         )
-        for i, (answers, queries) in enumerate(zip(query_answers, subject_queries)):
+        for answers, queries in zip(query_answers, subject_queries):
             # 3. filtering: we keep only valid candidates according to
             # db_info
             new_fact = filter_query_answers(answers, queries, db_info)
@@ -249,18 +258,15 @@ def sample_new_facts(
             # we don't want to generate another fact with the same
             # subject for that day
             subj_entities.remove(new_fact[0])
-            print(f"({i + 1}/{facts_per_day}) {new_fact}")
+            print(f"({len(new_facts)}/{facts_per_day}) {new_fact}")
+
+            # we don't need to generate new facts anymore: cancel
+            # remaining workers (will generate a warning the first
+            # time)
+            if len(new_facts) == facts_per_day:
+                break
 
         tries_nb += 1
-
-        for i, new_fact in enumerate(local_new_facts):
-            if new_fact is None:
-                continue
-            new_facts.append(new_fact)
-            # we don't want to generate another fact with the same
-            # subject for that day
-            subj_entities.remove(new_fact[0])
-            print(f"({i + 1}/{facts_per_day}) {new_fact}")
 
     if tries_nb > max_tries_nb:
         print("I give up.")
