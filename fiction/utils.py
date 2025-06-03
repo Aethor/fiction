@@ -1,6 +1,7 @@
 from typing import Any, List, Optional, Tuple
 import json
 import pathlib as pl
+from dataclasses import dataclass
 
 Fact = Tuple[str, str, str, str]
 
@@ -36,3 +37,35 @@ def load_facts(path: pl.Path, progress_msg: Optional[str] = None) -> List[Fact]:
     if not progress_msg is None:
         print("done!")
     return facts
+
+
+@dataclass
+class FactDataset:
+    train_facts: list[Fact]
+    valid_facts: list[Fact]
+    test_facts: list[Fact]
+    entity2id: dict[str, int]
+    rel2id: dict[str, int]
+    ts2id: dict[str, int]
+
+    def all_facts(self) -> list[Fact]:
+        return self.train_facts + self.valid_facts + self.test_facts
+
+    def subj_entities(self) -> set[str]:
+        return {f[0] for f in self.all_facts()}
+
+    def obj_entities(self) -> set[str]:
+        return {f[2] for f in self.all_facts()}
+
+
+def load_fact_dataset(root: pl.Path) -> FactDataset:
+    train_facts = load_facts(root / "train.txt")
+    valid_facts = load_facts(root / "valid.txt")
+    test_facts = load_facts(root / "test.txt")
+    with open(root / "entity2id.json") as f:
+        entity2id = json.load(f)
+    with open(root / "relation2id.json") as f:
+        rel2id = json.load(f)
+    with open(root / "ts2id.json") as f:
+        ts2id = json.load(f)
+    return FactDataset(train_facts, valid_facts, test_facts, entity2id, rel2id, ts2id)
