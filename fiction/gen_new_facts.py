@@ -238,7 +238,7 @@ def sample_new_facts(
             delayed(query)(subject_queries[i], rules, fact_dataset)
             for i in range(to_gen_nb)
         )
-        for answers, queries in zip(query_answers, subject_queries):
+        for i, (answers, queries) in enumerate(zip(query_answers, subject_queries)):
             # 3. filtering: we keep only valid candidates according to
             # db_info
             new_fact = filter_query_answers(answers, queries, db_info)
