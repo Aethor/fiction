@@ -73,7 +73,7 @@ def query(
     entity2id: Dict[str, int],
     rel2id: Dict[str, int],
     ts2id: Dict[str, int],
-    process_nb: int = 1,
+    parallel: Parallel,
 ) -> List[QueryOutput]:
     if len(queries) == 0:
         return []
@@ -91,7 +91,7 @@ def query(
     grapher = make_grapher(queries, train_facts, entity2id, rel2id, updated_ts2id)
 
     id2entity = {v: k for k, v in entity2id.items()}
-    if process_nb == 1:
+    if parallel.n_jobs == 1:
         window = 0
         scores, _ = apply_rules(
             grapher.test_idx,
@@ -121,8 +121,8 @@ def query(
         return answers
     else:
         window = 0
-        queries_nb = len(grapher.test_idx) // process_nb
-        poutput = Parallel(n_jobs=process_nb)(
+        queries_nb = len(grapher.test_idx) // parallel.n_jobs
+        poutput = parallel(
             delayed(apply_rules)(
                 grapher.test_idx,
                 rules,
@@ -139,11 +139,11 @@ def query(
                 [[0.1, 0.5]],  # args for score_12
                 window,  # window
             )
-            for i in range(process_nb)
+            for i in range(parallel.n_jobs)
         )
 
         answers = [[] for _ in range(len(queries))]
-        for i in range(process_nb):
+        for i in range(parallel.n_jobs):
             for answer_i, scores in poutput[i][0][0].items():
                 try:
                     answers[answer_i] = [(id2entity[k], v) for k, v in scores.items()]
@@ -211,7 +211,7 @@ def sample_new_fact(
     rel2id: Dict[str, int],
     ts2id: Dict[str, int],
     db_info: YagoDBInfo,
-    process_nb: int = 1,
+    parallel: Parallel,
 ) -> Optional[Fact]:
     rel_candidates: List[str] = []
     for rel in rel2id:
@@ -235,7 +235,7 @@ def sample_new_fact(
         entity2id,
         rel2id,
         ts2id,
-        process_nb=process_nb,
+        parallel,
     )
     # transform each (obj, score) couple into fact
     obj_candidates = [
@@ -319,42 +319,43 @@ if __name__ == "__main__":
     new_facts = []
     d = date(args.year, 1, 1)
 
-    while d.year < args.year + 1:
-        ts = d.strftime("%Y-%m-%d")
+    with Parallel(n_jobs=args.process_nb) as parallel:
+        while d.year < args.year + 1:
+            ts = d.strftime("%Y-%m-%d")
 
-        for i in range(args.facts_per_day):
-            new_fact = None
-            print(f"generating a fact for {ts}...", end="")
-            tries = 0
+            for i in range(args.facts_per_day):
+                new_fact = None
+                print(f"generating a fact for {ts}...", end="")
+                tries = 0
 
-            while new_fact is None and tries <= 10:
-                entity = random.choice(subj_entities)
-                entity_facts = [f for f in train_facts if f[0] == entity]
-                new_fact = sample_new_fact(
-                    entity,
-                    entity_facts,
-                    ts,
-                    rules,
-                    train_facts,
-                    entity2id,
-                    rel2id,
-                    ts2id,
-                    db_info,
-                    process_nb=args.process_nb,
-                )
-                tries += 1
-                print(f".", end="", flush=True)
+                while new_fact is None and tries <= 10:
+                    entity = random.choice(subj_entities)
+                    entity_facts = [f for f in train_facts if f[0] == entity]
+                    new_fact = sample_new_fact(
+                        entity,
+                        entity_facts,
+                        ts,
+                        rules,
+                        train_facts,
+                        entity2id,
+                        rel2id,
+                        ts2id,
+                        db_info,
+                        parallel,
+                    )
+                    tries += 1
+                    print(f".", end="", flush=True)
 
-            if new_fact is None:
-                print(f"I give up.")
-            else:
-                train_facts.append(new_fact)
-                new_facts.append(new_fact)
-                if not ts in ts2id:
-                    ts2id[ts] = max(ts2id.values()) + 1
-                print(new_fact)
+                if new_fact is None:
+                    print(f"I give up.")
+                else:
+                    train_facts.append(new_fact)
+                    new_facts.append(new_fact)
+                    if not ts in ts2id:
+                        ts2id[ts] = max(ts2id.values()) + 1
+                    print(new_fact)
 
-        d = d + timedelta(days=1)
+            d = d + timedelta(days=1)
 
     with open(args.output_file, "w") as f:
         for subj, rel, obj, ts in new_facts:
