@@ -37,8 +37,8 @@ if __name__ == "__main__":
         + load_facts(args.dataset_dir / "test.txt")
     )
 
-    with open(args.output_file) as f:
+    with open(args.output_file, "w") as f:
         for subj, rel, obj, ts in facts:
-            year = ts.split("-")[0]
+            year = int(ts.split("-")[0])
             if year >= args.min_year and year <= args.max_year:
                 f.write(f"{subj}\t{rel}\t{obj}\t{ts}\n")
