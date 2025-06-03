@@ -39,6 +39,7 @@ def make_grapher(
     grapher = Grapher.__new__(Grapher)
     grapher.dataset_dir = None
     grapher.entity2id = fact_dataset.entity2id.copy()
+    grapher.entity2id["?"] = -1
     grapher.relation2id = fact_dataset.rel2id.copy()
     counter = len(fact_dataset.rel2id)
     for relation in fact_dataset.rel2id:
@@ -69,8 +70,6 @@ def query(
 ) -> List[QueryOutput]:
     if len(queries) == 0:
         return []
-
-    fact_dataset.entity2id["?"] = -1
 
     # Updated ts2id to incorporate query timestamps since they might
     # not be in fact_dataset
@@ -164,13 +163,9 @@ def is_fact_valid(fact: Fact, db_info: YagoDBInfo) -> bool:
     return out
 
 
-def try_sample_new_fact(
-    subj: str,
-    ts: str,
-    rules: dict,
-    fact_dataset: FactDataset,
-    db_info: YagoDBInfo,
-) -> Optional[Fact]:
+def prepare_queries(
+    subj: str, fact_dataset: FactDataset, db_info: YagoDBInfo
+) -> List[Query]:
     rel_candidates: List[str] = []
 
     subj_facts = [f for f in fact_dataset.all_facts() if f[0] == subj]
@@ -188,14 +183,16 @@ def try_sample_new_fact(
         else:
             rel_candidates.append(rel)
 
-    # [[(object, score), ...], ... x len(future_rels_candidate)]
-    answers = query(
-        [(subj, rel, "?", ts) for rel in rel_candidates], rules, fact_dataset
-    )
+    return [(subj, rel, "?", ts) for rel in rel_candidates]
+
+
+def filter_query_answers(
+    answers: List[QueryOutput], queries: List[Query], db_info: YagoDBInfo
+) -> Optional[Fact]:
     # transform each (obj, score) couple into fact
     obj_candidates = [
-        [(subj, rel, obj, ts) for obj, _ in candidates]
-        for candidates, rel in zip(answers, rel_candidates)
+        [(query[0], query[1], obj, query[3]) for obj, _ in candidates]
+        for candidates, query in zip(answers, queries)
     ]
     # filter and keep only valid facts
     obj_candidates = [
@@ -228,14 +225,25 @@ def sample_new_facts(
     while len(new_facts) < facts_per_day or tries_nb > max_tries_nb:
         to_gen_nb = facts_per_day - len(new_facts)
         subjects = random.sample(list(subj_entities), k=to_gen_nb)
-        local_new_facts = list(
-            parallel(
-                delayed(try_sample_new_fact)(
-                    subjects[i], ts, rules, fact_dataset, db_info
-                )
-                for i in range(to_gen_nb)
-            )
+
+        # We have to cut processing in 3 steps. Steps 1 and 3 cant be
+        # parallelized with joblib since that would require copying
+        # db_info, which is way too large.
+        # 1. preparation
+        subject_queries = [
+            prepare_queries(subj, fact_dataset, db_info) for subj in subjects
+        ]
+        # 2. TLogic query
+        query_answers = parallel(
+            delayed(query)(subject_queries[i], rules, fact_dataset)
+            for i in range(to_gen_nb)
         )
+        # 3. filtering
+        local_new_facts = [
+            filter_query_answers(answers, queries, db_info)
+            for answers, queries in zip(query_answers, subject_queries)
+        ]
+
         tries_nb += 1
         for i, new_fact in enumerate(local_new_facts):
             if new_fact is None:
