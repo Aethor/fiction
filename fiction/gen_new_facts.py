@@ -255,14 +255,49 @@ def sample_new_fact(
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser()
-    parser.add_argument("-r", "--rules", type=pl.Path)
-    parser.add_argument("-l", "--rule-lengths", nargs="*", type=int)
-    parser.add_argument("-d", "--dataset-dir", type=pl.Path)
-    parser.add_argument("-y", "--yago-dir", type=pl.Path)
-    parser.add_argument("-o", "--output-file", type=pl.Path)
-    parser.add_argument("-e", "--year", type=int)
-    parser.add_argument("-n", "--facts-per-day", type=int)
-    parser.add_argument("-p", "--process-nb", type=int, default=1)
+    parser.add_argument(
+        "-r",
+        "--rules",
+        type=pl.Path,
+        help="Rules learned by TLogic to generate new facts.",
+    )
+    parser.add_argument(
+        "-l", "--rule-lengths", nargs="*", type=int, help="TLogic rule lengths."
+    )
+    parser.add_argument(
+        "-d",
+        "--dataset-dir",
+        type=pl.Path,
+        help="Starting dataset directory, with {train|valid|test}.txt and {entity2id|relation2id|ts2id}.json.",
+    )
+    parser.add_argument(
+        "-y",
+        "--yago-dir",
+        type=pl.Path,
+        help="YAGO directory. Used to ensure that generated facts respect database scheme.",
+    )
+    parser.add_argument(
+        "-o",
+        "--output-file",
+        type=pl.Path,
+        help="File where new facts will be dumped, one per line.",
+    )
+    parser.add_argument(
+        "-e", "--year", type=int, help="Year for which to generate new facts."
+    )
+    parser.add_argument(
+        "-n",
+        "--facts-per-day",
+        type=int,
+        help="Number of facts to generate for each day of the given year.",
+    )
+    parser.add_argument(
+        "-p",
+        "--process-nb",
+        type=int,
+        default=1,
+        help="Number of process used for generation (note: currently this does not seem to increase performance).",
+    )
     args = parser.parse_args()
 
     rules = load_rules(args.rules, args.rule_lengths)
