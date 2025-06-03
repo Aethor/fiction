@@ -238,13 +238,21 @@ def sample_new_facts(
             delayed(query)(subject_queries[i], rules, fact_dataset)
             for i in range(to_gen_nb)
         )
-        # 3. filtering
-        local_new_facts = [
-            filter_query_answers(answers, queries, db_info)
-            for answers, queries in zip(query_answers, subject_queries)
-        ]
+        for answers, queries in zip(query_answers, subject_queries):
+            # 3. filtering: we keep only valid candidates according to
+            # db_info
+            new_fact = filter_query_answers(answers, queries, db_info)
+            if new_fact is None:
+                continue
+
+            new_facts.append(new_fact)
+            # we don't want to generate another fact with the same
+            # subject for that day
+            subj_entities.remove(new_fact[0])
+            print(f"({i + 1}/{facts_per_day}) {new_fact}")
 
         tries_nb += 1
+
         for i, new_fact in enumerate(local_new_facts):
             if new_fact is None:
                 continue
@@ -317,7 +325,7 @@ if __name__ == "__main__":
     new_facts = []
     d = date(args.year, 1, 1)
 
-    with Parallel(n_jobs=args.process_nb) as parallel:
+    with Parallel(n_jobs=args.process_nb, return_as="generator_unordered") as parallel:
         while d.year < args.year + 1:
             ts = d.strftime("%Y-%m-%d")
 
