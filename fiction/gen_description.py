@@ -217,35 +217,35 @@ if __name__ == "__main__":
         help="file containing facts, one fact per line.",
     )
     parser.add_argument(
-        "-m",
+        "-mn",
         "--multi-min-size",
         type=int,
         default=None,
         help="Min size for multi-facts generation.",
     )
     parser.add_argument(
-        "-m",
+        "-mx",
         "--multi-max-size",
         type=int,
         default=None,
         help="Max size for multi-facts generation.",
     )
     parser.add_argument(
-        "-m",
+        "-my",
         "--multi-yago-dir",
         type=pl.Path,
         default=None,
         help="Yago directory for multi-facts generation.",
     )
     parser.add_argument(
-        "-m",
+        "-ma",
         "--multi-alpha",
         type=float,
         default=None,
         help="alpha in fact similarity computation for multi-facts generation.",
     )
     parser.add_argument(
-        "-m",
+        "-mk",
         "--multi-k",
         type=float,
         default=None,
