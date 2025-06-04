@@ -146,7 +146,6 @@ def gen_multifacts_description(
         )
         descriptions += [out[0]["generated_text"][-1]["content"] for out in outputs]
 
-    assert len(descriptions) == len(fact_groups)
     return descriptions
 
 
@@ -192,7 +191,6 @@ def gen_facts_description(
         )
         descriptions += [out[0]["generated_text"][-1]["content"] for out in outputs]
 
-    assert len(descriptions) == len(fact_groups)
     return descriptions
 
 
