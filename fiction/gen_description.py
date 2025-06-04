@@ -134,6 +134,7 @@ def gen_multifacts_description(
         ]
         for fact_group in fact_groups
     ]
+    pipe.tokenizer.apply_chat_template(messages[0])
 
     descriptions = []
     for i in tqdm(range(0, len(messages), batch_size)):
@@ -180,6 +181,7 @@ def gen_facts_description(
         ]
         for fact in facts
     ]
+    pipe.tokenizer.apply_chat_template(messages[0])
 
     descriptions = []
     for i in tqdm(range(0, len(messages), batch_size)):
