@@ -267,6 +267,7 @@ if __name__ == "__main__":
         model_kwargs={"torch_dtype": torch.bfloat16},
         device_map="auto",
     )
+    pipe.tokenizer.pad_token_id = pipe.tokenizer.eos_token_id
 
     dataset = []
     if args.multi_min_size:  # all --multi arguments should be specified
