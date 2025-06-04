@@ -2,7 +2,8 @@ from typing import Tuple, List
 import argparse, re
 import pathlib as pl
 import torch
-import transformers
+from transformers import pipeline  # type: ignore
+from transformers.pipelines.base import Pipeline
 from tqdm import tqdm
 import numpy as np
 from more_itertools import flatten
@@ -109,7 +110,7 @@ def group_related_facts(
 
 
 def gen_multifacts_description(
-    fact_groups: List[List[Fact]], pipeline: transformers.pipeline, batch_size: int = 4
+    fact_groups: List[List[Fact]], pipe: Pipeline, batch_size: int = 4
 ) -> List[str]:
     prompt = """Given the following events represented as quadruplets of the form (subject, relation, object, timestamp):
     {}
@@ -137,10 +138,10 @@ def gen_multifacts_description(
     descriptions = []
     for i in tqdm(range(0, len(messages), batch_size)):
         batch = messages[i : i + batch_size]
-        outputs = pipeline(
+        outputs = pipe(
             batch,
             max_new_tokens=256,
-            pad_token_id=pipeline.tokenizer.eos_token_id,
+            pad_token_id=pipe.tokenizer.eos_token_id,
             batch_size=batch_size,
         )
         descriptions += [out[0]["generated_text"][-1]["content"] for out in outputs]
@@ -149,20 +150,18 @@ def gen_multifacts_description(
     return descriptions
 
 
-def gen_multifact_description(
-    fact_group: List[Fact], pipeline: transformers.pipeline
-) -> str:
-    return gen_multifacts_description([fact_group], pipeline)[0]
+def gen_multifact_description(fact_group: List[Fact], pipe: Pipeline) -> str:
+    return gen_multifacts_description([fact_group], pipe)[0]
 
 
 def gen_facts_description(
-    facts: List[Fact], pipeline: transformers.pipeline, batch_size: int = 4
+    facts: List[Fact], pipe: Pipeline, batch_size: int = 4
 ) -> List[str]:
     """Given list of quadruples FACTS, generate a description using
-    PIPELINE.
+    PIPE.
 
     :param facts: quadruples for which to generate a description
-    :param pipeline: huggingface text-generation pipeline
+    :param pipe: huggingface text-generation pipeline
     """
     prompt = """Given the following event represented as a quadruplet of the form (subject, relation, object, timestamp):
     {}
@@ -185,10 +184,10 @@ def gen_facts_description(
     descriptions = []
     for i in tqdm(range(0, len(messages), batch_size)):
         batch = messages[i : i + batch_size]
-        outputs = pipeline(
+        outputs = pipe(
             batch,
             max_new_tokens=256,
-            pad_token_id=pipeline.tokenizer.eos_token_id,
+            pad_token_id=pipe.tokenizer.eos_token_id,
             batch_size=batch_size,
         )
         descriptions += [out[0]["generated_text"][-1]["content"] for out in outputs]
@@ -197,13 +196,13 @@ def gen_facts_description(
     return descriptions
 
 
-def gen_fact_description(fact: Fact, pipeline) -> str:
+def gen_fact_description(fact: Fact, pipe: Pipeline) -> str:
     """Given the quadruples FACT, generate a description using LM.
 
     :param fact: quadruple for which to generate a description
-    :param pipeline: huggingface text-generation pipeline
+    :param pipe: huggingface text-generation pipeline
     """
-    return gen_facts_description([fact], pipeline)[0]
+    return gen_facts_description([fact], pipe)[0]
 
 
 if __name__ == "__main__":
@@ -259,12 +258,13 @@ if __name__ == "__main__":
 
     facts = load_facts(args.facts_file, "loading facts")
 
-    pipeline = transformers.pipeline(
+    pipe = pipeline(
         "text-generation",
         model=args.language_model,
         model_kwargs={"torch_dtype": torch.bfloat16},
         device_map="auto",
     )
+    pipe.tokenizer.pad_token_id = pipe.model.config.eos_token_id
 
     dataset = []
     if args.multi_min_size:  # all --multi arguments should be specified
@@ -277,7 +277,7 @@ if __name__ == "__main__":
             alpha=args.multi_alpha,
             k=args.multi_k,
         )
-        descs = gen_multifacts_description(fact_groups, pipeline)
+        descs = gen_multifacts_description(fact_groups, pipe)
         for fact_group, desc in zip(fact_groups, descs):
             dataset.append(
                 {
@@ -294,7 +294,7 @@ if __name__ == "__main__":
                 }
             )
     else:
-        descs = gen_facts_description(facts, pipeline)
+        descs = gen_facts_description(facts, pipe)
         for fact, desc in zip(facts, descs):
             dataset.append(
                 {
