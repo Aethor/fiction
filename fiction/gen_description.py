@@ -134,7 +134,6 @@ def gen_multifacts_description(
         ]
         for fact_group in fact_groups
     ]
-    pipe.tokenizer.apply_chat_template(messages[0])
 
     descriptions = []
     for i in tqdm(range(0, len(messages), batch_size)):
@@ -181,7 +180,6 @@ def gen_facts_description(
         ]
         for fact in facts
     ]
-    pipe.tokenizer.apply_chat_template(messages[0])
 
     descriptions = []
     for i in tqdm(range(0, len(messages), batch_size)):
@@ -254,7 +252,10 @@ if __name__ == "__main__":
     )
     parser.add_argument("-o", "--output-file", type=pl.Path, help="output JSON file.")
     parser.add_argument(
-        "-l", "--language-model", type=str, default="mistralai/Mistral-7B-v0.1"
+        "-l",
+        "--language-model",
+        type=str,
+        default="meta-llama/Meta-Llama-3.1-8B-Instruct",
     )
     args = parser.parse_args()
 
@@ -266,7 +267,6 @@ if __name__ == "__main__":
         model_kwargs={"torch_dtype": torch.bfloat16},
         device_map="auto",
     )
-    pipe.tokenizer.pad_token_id = pipe.model.config.eos_token_id
 
     dataset = []
     if args.multi_min_size:  # all --multi arguments should be specified
