@@ -117,7 +117,7 @@ def get_relation_desc(rel: str) -> Optional[str]:
 
     if YAGO_REL_DESC is None:
         YAGO_REL_DESC = {}
-        with open("./yago_rel_desc.csv") as f:
+        with open(f"{__file__}/yago_rel_desc.csv") as f:
             for line in f:
                 try:
                     rel, desc = line.rstrip("\n").split(",")
