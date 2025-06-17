@@ -1,4 +1,4 @@
-from typing import Tuple, List
+from typing import Tuple, List, Optional
 import argparse, re
 import pathlib as pl
 import torch
@@ -109,10 +109,31 @@ def group_related_facts(
     return [c for c in flatten(clusters) if len(c) >= min_size]
 
 
+YAGO_REL_DESC: Optional[dict[str, str]] = None
+
+
+def get_relation_desc(rel: str) -> Optional[str]:
+    global YAGO_REL_DESC
+
+    if YAGO_REL_DESC is None:
+        YAGO_REL_DESC = {}
+        with open("./yago_rel_desc.csv") as f:
+            for line in f:
+                try:
+                    rel, desc = line.rstrip("\n").split(",")
+                    YAGO_REL_DESC[rel] = desc
+                except ValueError:
+                    continue
+
+    return YAGO_REL_DESC.get(rel)
+
+
 def gen_multifacts_description(
     fact_groups: List[List[Fact]], pipe: Pipeline, batch_size: int = 4
 ) -> List[str]:
     prompt = """Given the following events represented as quadruplets of the form (subject, relation, object, timestamp):
+    {}
+    and the following definitions for the relations:
     {}
     Generate a short paragraph describing these events, in the style of a newspaper.
     You can add additional details, but the entirety of the information in the given quadruplets must be preserved. 
@@ -128,7 +149,11 @@ def gen_multifacts_description(
             {
                 "role": "user",
                 "content": prompt.format(
-                    "\n".join(str(format_fact(fact)) for fact in fact_group)
+                    "\n".join(str(format_fact(fact)) for fact in fact_group),
+                    "\n".join(
+                        f"{fact[1]}: {get_relation_desc(fact[1])}"
+                        for fact in fact_group
+                    ),
                 ),
             },
         ]
@@ -164,6 +189,8 @@ def gen_facts_description(
     """
     prompt = """Given the following event represented as a quadruplet of the form (subject, relation, object, timestamp):
     {}
+    and the following definition for the relation:
+    {}
     Generate a one to three sentences description text for this event, in the style of a newspaper.
     You can add additional details, but the entirety of the information in the given quadruplet must be preserved. 
     Do NOT add any additional information or text: you must only generate the description.
@@ -175,7 +202,10 @@ def gen_facts_description(
                 "role": "system",
                 "content": "You are a generation model that is expert at outputting description of events.",
             },
-            {"role": "user", "content": prompt.format(format_fact(fact))},
+            {
+                "role": "user",
+                "content": prompt.format(format_fact(fact), get_relation_desc(fact[1])),
+            },
         ]
         for fact in facts
     ]
