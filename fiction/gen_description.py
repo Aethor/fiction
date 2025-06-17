@@ -36,12 +36,12 @@ def clean_fact_prefix(fact: Fact) -> Fact:
 
 
 def parse_hex_unicode(hex_unicode: str) -> str:
-    assert hex_unicode.startswith("u")
+    assert hex_unicode.lower().startswith("u")
     return chr(int(hex_unicode[1:], base=16))
 
 
 def clean_unicode(elt: str) -> str:
-    return re.sub(r"_u[0-9A-E]{4}", lambda m: parse_hex_unicode(m.group()[1:]), elt)
+    return re.sub(r"_[uU][0-9A-E]{4}", lambda m: parse_hex_unicode(m.group()[1:]), elt)
 
 
 def clean_fact_unicode(fact: Fact) -> Fact:
