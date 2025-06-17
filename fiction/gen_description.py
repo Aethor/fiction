@@ -1,5 +1,5 @@
 from typing import Tuple, List, Optional
-import argparse, re
+import argparse, re, os
 import pathlib as pl
 import torch
 from transformers import pipeline  # type: ignore
@@ -117,7 +117,8 @@ def get_relation_desc(rel: str) -> Optional[str]:
 
     if YAGO_REL_DESC is None:
         YAGO_REL_DESC = {}
-        with open(f"{__file__}/yago_rel_desc.csv") as f:
+        directory = os.path.dirname(__file__)
+        with open(f"{directory}/yago_rel_desc.csv") as f:
             for line in f:
                 try:
                     rel, desc = line.rstrip("\n").split(",")
