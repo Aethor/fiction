@@ -69,11 +69,21 @@ def clean_fact_wiki_id(fact: Fact) -> Fact:
     return (clean_wiki_id(subj), rel, clean_wiki_id(obj), ts)
 
 
+def clean_generic_instance(elt: str) -> str:
+    return re.sub(r" ?generic instance", "", elt, flags=re.IGNORECASE)
+
+
+def clean_fact_generic_instance(fact: Fact) -> Fact:
+    subj, rel, obj, ts = fact
+    return (clean_generic_instance(subj), rel, clean_generic_instance(obj), ts)
+
+
 def format_fact(fact: Fact) -> Fact:
     fact = clean_fact_prefix(fact)
     fact = clean_fact_unicode(fact)
     fact = clean_fact_wiki_id(fact)
     fact = clean_fact_underscore(fact)
+    fact = clean_fact_generic_instance(fact)
     return fact
 
 
