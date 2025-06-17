@@ -11,6 +11,7 @@ from sklearn.cluster import AgglomerativeClustering
 from fiction.yagottl.TurtleUtils import YagoDBInfo
 from fiction.yagottl.schema import facts_dist
 from fiction.utils import dump_json, load_facts
+from fiction.yago_rel_desc import YAGO_REL_DESC
 
 # (subj, rel, obj, ts)
 Fact = Tuple[str, str, str, str]
@@ -119,30 +120,8 @@ def group_related_facts(
     return [c for c in flatten(clusters) if len(c) >= min_size]
 
 
-YAGO_REL_DESC: Optional[dict[str, str]] = None
-
-
-def get_relation_desc(rel: str) -> Optional[str]:
-    global YAGO_REL_DESC
-
-    if YAGO_REL_DESC is None:
-        YAGO_REL_DESC = {}
-        directory = os.path.dirname(__file__)
-        with open(f"{directory}/yago_rel_desc.csv") as f:
-            for line in f:
-                try:
-                    rel, desc = line.rstrip("\n").split(",")
-                    YAGO_REL_DESC[rel] = desc
-                except ValueError:
-                    continue
-
-    return YAGO_REL_DESC.get(rel)
-
-
-def gen_multifacts_description(
-    fact_groups: List[List[Fact]], pipe: Pipeline, batch_size: int = 4
-) -> List[str]:
-    prompt = """Given the following events represented as quadruplets of the form (subject, relation, object, timestamp):
+def _get_multifact_prompt(fact_group: list[Fact]) -> str:
+    prompt_template = """Given the following events represented as quadruplets of the form (subject, relation, object, timestamp):
     {}
     and the following definitions for the relations:
     {}
@@ -150,7 +129,17 @@ def gen_multifacts_description(
     You can add additional details, but the entirety of the information in the given quadruplets must be preserved. 
     Do NOT add any additional information or text: you must only generate the description.
     """
+    formatted_facts = [format_fact(fact) for fact in fact_group]
+    relations = {rel for _, rel, _, _ in formatted_facts}
+    return prompt_template.format(
+        "\n".join(str(fact) for fact in formatted_facts),
+        "\n".join(f"{rel}: {YAGO_REL_DESC.get(rel)}" for rel in relations),
+    )
 
+
+def gen_multifacts_description(
+    fact_groups: List[List[Fact]], pipe: Pipeline, batch_size: int = 4
+) -> List[str]:
     messages = [
         [
             {
@@ -159,13 +148,7 @@ def gen_multifacts_description(
             },
             {
                 "role": "user",
-                "content": prompt.format(
-                    "\n".join(str(format_fact(fact)) for fact in fact_group),
-                    "\n".join(
-                        f"{fact[1]}: {get_relation_desc(fact[1])}"
-                        for fact in fact_group
-                    ),
-                ),
+                "content": _get_multifact_prompt(fact_group),
             },
         ]
         for fact_group in fact_groups
@@ -189,6 +172,20 @@ def gen_multifact_description(fact_group: List[Fact], pipe: Pipeline) -> str:
     return gen_multifacts_description([fact_group], pipe)[0]
 
 
+def _get_fact_prompt(fact: Fact) -> str:
+    prompt_template = """Given the following event represented as a quadruplet of the form (subject, relation, object, timestamp):
+    {}
+    and the following definition for the {} relation:
+    {}
+    Generate a one to three sentences description text for this event, in the style of a newspaper.
+    You can add additional details, but the entirety of the information in the given quadruplet must be preserved. 
+    Do NOT add any additional information or text: you must only generate the description.
+    """
+    formatted_fact = format_fact(fact)
+    relation = formatted_fact[1]
+    return prompt_template.format(formatted_fact, relation, YAGO_REL_DESC.get(relation))
+
+
 def gen_facts_description(
     facts: List[Fact], pipe: Pipeline, batch_size: int = 4
 ) -> List[str]:
@@ -198,25 +195,13 @@ def gen_facts_description(
     :param facts: quadruples for which to generate a description
     :param pipe: huggingface text-generation pipeline
     """
-    prompt = """Given the following event represented as a quadruplet of the form (subject, relation, object, timestamp):
-    {}
-    and the following definition for the relation:
-    {}
-    Generate a one to three sentences description text for this event, in the style of a newspaper.
-    You can add additional details, but the entirety of the information in the given quadruplet must be preserved. 
-    Do NOT add any additional information or text: you must only generate the description.
-    """
-
     messages = [
         [
             {
                 "role": "system",
                 "content": "You are a generation model that is expert at outputting description of events.",
             },
-            {
-                "role": "user",
-                "content": prompt.format(format_fact(fact), get_relation_desc(fact[1])),
-            },
+            {"role": "user", "content": _get_fact_prompt(fact)},
         ]
         for fact in facts
     ]
