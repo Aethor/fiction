@@ -1,0 +1,135 @@
+startAcademicDegree,The subject entity started working through the degree specified by the object entity
+academicDegree,The subject entity has the degree specified by the object entity
+endAcademicDegree,The subject entity obtained the degree specified by the object entity
+startActor,The subject entity started having an actor specified by the object entity
+actor,The subject entity has an actor specified by the object entity
+endActor,The subject entity ended its association with the actor specified by the object entity
+affiliation,The subject entity is affiliated by the organization specified by the object entity
+startAlumniOf,The subject entity started a student or member position the organization specified by the object entity
+alumniOf,The subject entity is an alumni of the organization specified by the object entity
+endAlumniOf,The subject entity ended its student or member position with the organization specified by the object entity
+startAppearsIn,The subject entity started appearing in the creative work specified by the object entity
+appearsIn,The subject entity appears in the creative work specified by the object entity
+endAppearsIn,The subject entity no longer appears in the creative work specified by the object entity
+startAward,The subject entity has won the award specified by the object entity
+award,The subject entity has won the award specified by the object entity
+endAward,The subject entity ended its possession of the award specified by the object entity
+startBeliefSystem,The subject entity started adhering to the belief system specified by the object entity
+beliefSystem,The subject entity adheres to the belief system specified by the object entity
+endBeliefSystem,The subject entity no longer adheres to the belief system specified by the object entity
+candidateIn,The subject entity is a candidate in the event specified by the object entity
+startCapital,The subject entity started having the object entity for capital
+capital,The subject entity has the object entity for capital
+endCapital,The subject entity no longer has the object entity for capital
+children,The subject entity is the parent of the object entity
+startConferredBy,The subject entity started being conferred by the object entity
+conferredBy,The subject entity is conferred by the object entity
+endConferredBy,The subject entity is no longer conferred by the object entity
+startContentLocation,The subject entity started depicting or describing the location specified by the object entity
+contentLocation,The subject entity depicts or describes the location specified by the object entity
+endContentLocation,The subject no longer depicts or describes the location specified by the object entity
+startDirector,The subject entity's director started being the object entity
+director,The subject entity's director is the object entity
+endDirector,The subject entity's director is no longer the object entity
+startDoctoralAdvisor,The subject entity's started having the object entity as doctoral advisor
+doctoralAdvisor,The subject entity's started having the object entity as doctoral advisor
+endDoctoralAdvisor,The subject entity's no longer has the object entity as doctoral advisor
+startEditor,The subject entity started being edited by the person specified by the object entity
+editor,The subject entity was edited by the person specified by the object entity
+endEditor,The subject entity is no longer edited by the person specified by the object entity
+startFlowsInto,The subject entity started flowing into the object entity
+flowsInto,The subject entity flows into the object entity
+endFlowsInto,The subject entity no longer flows into the object entity
+follows,The subject entity is a followup to the object entity
+founder,The subject entity was founded by the object entity
+startGender,The subject entity started having the gender specified by the object entity
+gender,The subject entity has the gender specified by the object entity
+endGender,The subject entity no longer has the gender specified by the object entity
+startHomeLocation,The subject entity's home started being at the location specified by the object entity
+homeLocation,The subject entity's home is at the location specified by the object entity
+endHomeLocation,The subject entity's home no longer is at the location specified by the object entity
+startInLanguage,The subject entity started being in the language specified by the object entity
+inLanguage,The subject entity is in the language specified by the object entity
+endInLanguage,The subject entity is no longer in the language specified by the object entity
+influencedBy,The subject entity was influenced by the object entity
+knowsLanguage,The subject entity knows the language specified by the object entity
+startLeader,The subject entity started being lead by the object entity
+leader,The subject entity is being lead by the object entity
+endLeader,The subject entity is no longer lead by the object entity
+startLocation,The subject entity started being at the location specified by the object entity
+location,The subject entity is at the location specified by the object entity
+endLocation,The subject entity no longer is at the location specified by the object entity
+locationCreated,The subject entity was created at the location specified by the object entity
+lowestPoint,The lowest point of the subject entity is the object entity
+lyricist,The lyrics of the subject entity were written by the object entity
+startManufacturer,The subject entity started being manufactured by the organization specified by the object entity
+manufacturer,The subject entity is manufactured by the organization specified by the object entity
+endManufacturer,The subject entity is no longer manufactured by the organization specified by the object entity
+startMaterial,The subject entity started being made of the material specified by the object entity
+material,The subject entity is made of the material specified by the object entity
+endMaterial,The subject entity is no longer made of the material specified by the object entity
+startMemberOf,The subject entity started being a member of the organization specified by the object entity
+memberOf,The subject entity is a member of the organization specified by the object entity
+endMemberOf,The subject entity no longer is a member of the organization specified by the object entity
+startMusicBy,The music of the subject entity started being composed by the object entity
+musicBy,The music of the subject entity was composed by the object entity
+endMusicBy,The music of the subject entity is no longer composed by the object entity
+startNationality,The subject entity acquired the nationality specified by the object entity
+nationality,The subject entity has the nationality specified by the object entity
+endNationality,The subject entity lost the nationality specified by the object entity
+startNeighbors,The subject entity started neighboring the object entity
+neighbors,The subject entity is neighboring the object entity
+endNeighbors,The subject entity is no longer neighboring the object entity
+startNotableWork,The subject entity started working on its its notable work specified by the object entity
+notableWork,The subject entity has a notable work specified by the object entity
+endNotableWork,The subject entity no longer works on its notable work specified by the object entity
+officialLanguage,The subject entity has an official language specified by the object entity
+startOrganizer,The subject entity started being organized by the object entity
+organizer,The subject entity is organized by the object entity
+endOrganizer,The subject entity is no longer organized by the object entity
+startOwnedBy,The subject entity started being owned by the object entity
+ownedBy,The subject entity is owned by the object entity
+endOwnedBy,The subject entity is no longer owned by the object entity
+startOwn,The subject entity started owning the object entity
+owns,The subject entity owns the object entity
+endOwns,The subject entity no longer owns the object entity
+startParticipant,The subject entity started having a participant specified by the object entity
+participant,The subject entity has a participant specified by the object entity
+endParticipant,The subject entity no longer has a participant specified by the object entity
+startPerformer,The subject entity started having a performer specified by the object entity
+performer,The subject entity has a performer specified by the object entity
+endPerformer,The subject entity no longer has a performer specified by the object entity
+startPlaysIn,The subject entity started playing in the structure specified by the object entity
+playsIn,The subject entity plays in the structure specified by the object entity
+endPlaysIn,The subject entity no longer plays in the structure specified by the object entity
+startProductionCompany,The subject entity started being produced by the organization specified by the object entity
+productionCompany,The subject entity is produced by the organization specified by the object entity
+endProductionCompany,The subject entity is not longer produced by the organization specified by the object entity
+startPublisher,The subject entity started being published by the object entity
+publisher,The subject entity was published by the object entity
+endPublisher,The subject entity is no longer published by the object entity
+startRecordLabel,The subject artist or band started operating under the label specified by the object entity
+recordLabel,The subject artist or band operates under the label specified by the object entity
+endRecordLabel,The subject artist or band no longer operates under the label specifie by the object entity
+startReplaces,The subject entity started replacing the object entity
+replaces,The subject entity replaces the object entity
+endReplaces,The subject entity no longer replaces the object entity
+startSponsor,The subject entity started being sponsored by the object entity
+sponsor,The subject entity is sponsored by the object entity
+endSponsor,The subject entity is no longer sponsored by the object entity
+startSportNumber,The subject entity's sport number started being the object entity
+sportNumber,The subject entity's sport number is the object entity
+endSportNumber,The subject entity's sport number no longer is the object entity
+startSpouse,The subject entity started a marriage with the object entity
+spouse,The subject entity is married to the object entity
+endSpouse,The subject entity ended their marriage with the object entity
+startStudentOf,The subject entity started being a student of the object entity
+studentOf,The subject entity is a student of the object entity
+endStudentOf,The subject entity no longer is a student of the object entity
+superEvent,The subject entity is part of a bigger event specified by the object entity
+startTerminus,The terminus of the subject entity started being the object entity
+terminus,The terminus of the subject entity is the object entity
+endTerminus,The terminus of the subject entity no longer is the object entity
+startWorksFor,The subject entity started working for the organization specified by the object entity
+worksFor,The subject entity works for the organization specified by the object entity
+endWorksFor,The subject entity no longer works for the organization specified by the object entity
