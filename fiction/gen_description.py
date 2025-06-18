@@ -131,7 +131,24 @@ def _get_multifact_prompt(fact_group: list[Fact]) -> str:
     Do NOT add any additional information or text: you must only generate the description.
     """
     formatted_facts = [format_fact(fact) for fact in fact_group]
+    formatted_facts = [randomize_fact_ts_style(fact) for fact in formatted_facts]
+
     relations = {rel for _, rel, _, _ in formatted_facts}
+
+    current_date = None
+    if random.random() < 0.25:
+        dates = sorted(
+            [datetime.strptime(ts, "%Y-%m-%d") for _, _, _, ts in fact_group]
+        )
+        min_date = dates[0] - timedelta(days=random.randint(0, 7))
+        max_date = dates[0] + timedelta(days=random.randint(0, 7))
+        delta = max_date - min_date
+        current_date = min_date + timedelta(random.randint(0, delta.days))
+        current_date = randomize_ts_style(current_date)
+
+    if not current_date is None:
+        prompt_template += f"The current date is {current_date}. In addition to the date of the event, indicate the current date at the top of your text as part of a news headline."
+
     return prompt_template.format(
         "\n".join(str(fact) for fact in formatted_facts),
         "\n".join(f"{rel}: {YAGO_REL_DESC.get(rel)}" for rel in relations),
@@ -180,33 +197,32 @@ def ts_day_ordinal(day: int) -> str:
     return str(day) + ord_suffix
 
 
-def randomize_ts_style(d: datetime) -> tuple[Optional[str], str]:
+def randomize_ts_style(d: datetime) -> str:
     day_style = random.choice(["%B ~d, %Y", "%Y-%m-%d"])
     weekday_style = random.choice(["%A, ", "%a, ", ""])
     style = weekday_style + day_style
-    curd = random.choice([None, d + timedelta(days=random.randint(-7, 7))])
-    return (
-        None
-        if curd is None
-        else curd.strftime(style).replace("~d", ts_day_ordinal(d.day)),
-        d.strftime(style).replace("~d", ts_day_ordinal(d.day)),
-    )
+    return d.strftime(style).replace("~d", ts_day_ordinal(d.day))
 
 
-def randomize_fact_ts_style(fact: Fact) -> tuple[Fact, Optional[str]]:
-    """
-    :return: (fact, current_date)
-    """
-    year, month, day = fact[3].split("-")
-    d = datetime(int(year), int(month), int(day))
-    current_date, new_ts = randomize_ts_style(d)
-    return ((fact[0], fact[1], fact[2], new_ts), current_date)
+def randomize_fact_ts_style(fact: Fact) -> Fact:
+    subj, rel, obj, ts = fact
+    d = datetime.strptime(ts, "%Y-%m-%d")
+    new_ts = randomize_ts_style(d)
+    return (subj, rel, obj, new_ts)
 
 
 def _get_fact_prompt(fact: Fact) -> str:
     formatted_fact = format_fact(fact)
-    formatted_fact, current_date = randomize_fact_ts_style(formatted_fact)
+
+    formatted_fact = randomize_fact_ts_style(formatted_fact)
+    current_date = None
+    if random.random() < 0.25:
+        d = datetime.strptime(fact[3], "%Y-%m-%d")
+        current_date = d + timedelta(days=random.randint(-7, 7))
+        current_date = randomize_ts_style(current_date)
+
     formatted_relation = formatted_fact[1]
+
     prompt = f"""Given the following event represented as a quadruplet of the form (subject, relation, object, timestamp):
     {formatted_fact},
     The following definition for the {formatted_relation} relation:
