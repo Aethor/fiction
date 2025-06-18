@@ -1,6 +1,7 @@
 from typing import Tuple, List, Optional
-import argparse, re, os
+import argparse, re, random
 import pathlib as pl
+from datetime import datetime, timedelta
 import torch
 from transformers import pipeline  # type: ignore
 from transformers.pipelines.base import Pipeline
@@ -172,18 +173,51 @@ def gen_multifact_description(fact_group: List[Fact], pipe: Pipeline) -> str:
     return gen_multifacts_description([fact_group], pipe)[0]
 
 
+def ts_day_ordinal(day: int) -> str:
+    ord_suffix = (
+        "th" if 10 <= day <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    )
+    return str(day) + ord_suffix
+
+
+def randomize_ts_style(d: datetime) -> tuple[Optional[str], str]:
+    day_style = random.choice(["%B ~d, %Y", "%Y-%m-%d"])
+    weekday_style = random.choice(["%A, ", "%a, ", ""])
+    style = weekday_style + day_style
+    curd = random.choice([None, d + timedelta(days=random.randint(-7, 7))])
+    return (
+        None
+        if curd is None
+        else curd.strftime(style).replace("~d", ts_day_ordinal(d.day)),
+        d.strftime(style).replace("~d", ts_day_ordinal(d.day)),
+    )
+
+
+def randomize_fact_ts_style(fact: Fact) -> tuple[Fact, Optional[str]]:
+    """
+    :return: (fact, current_date)
+    """
+    year, month, day = fact[3].split("-")
+    d = datetime(int(year), int(month), int(day))
+    current_date, new_ts = randomize_ts_style(d)
+    return ((fact[0], fact[1], fact[2], new_ts), current_date)
+
+
 def _get_fact_prompt(fact: Fact) -> str:
-    prompt_template = """Given the following event represented as a quadruplet of the form (subject, relation, object, timestamp):
-    {}
-    and the following definition for the {} relation:
-    {}
+    formatted_fact = format_fact(fact)
+    formatted_fact, current_date = randomize_fact_ts_style(formatted_fact)
+    formatted_relation = formatted_fact[1]
+    prompt = f"""Given the following event represented as a quadruplet of the form (subject, relation, object, timestamp):
+    {formatted_fact},
+    The following definition for the {formatted_relation} relation:
+    {YAGO_REL_DESC.get(formatted_relation)},
     Generate a one to three sentences description text for this event, in the style of a newspaper.
     You can add additional details, but the entirety of the information in the given quadruplet must be preserved. 
     Do NOT add any additional information or text: you must only generate the description.
     """
-    formatted_fact = format_fact(fact)
-    relation = formatted_fact[1]
-    return prompt_template.format(formatted_fact, relation, YAGO_REL_DESC.get(relation))
+    if not current_date is None:
+        prompt += f"The current date is {current_date}. In addition to the date of the event, indicate the current date at the top of your text as part of a news headline."
+    return prompt
 
 
 def gen_facts_description(
