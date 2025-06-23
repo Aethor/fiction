@@ -1,6 +1,7 @@
 from typing import Tuple, List, Optional
-import argparse, re, os
+import argparse, re, random
 import pathlib as pl
+from datetime import datetime, timedelta
 import torch
 from transformers import pipeline  # type: ignore
 from transformers.pipelines.base import Pipeline
@@ -11,6 +12,7 @@ from sklearn.cluster import AgglomerativeClustering
 from fiction.yagottl.TurtleUtils import YagoDBInfo
 from fiction.yagottl.schema import facts_dist
 from fiction.utils import dump_json, load_facts
+from fiction.yago_rel_desc import YAGO_REL_DESC
 
 # (subj, rel, obj, ts)
 Fact = Tuple[str, str, str, str]
@@ -36,12 +38,12 @@ def clean_fact_prefix(fact: Fact) -> Fact:
 
 
 def parse_hex_unicode(hex_unicode: str) -> str:
-    assert hex_unicode.startswith("u")
+    assert hex_unicode.lower().startswith("u")
     return chr(int(hex_unicode[1:], base=16))
 
 
 def clean_unicode(elt: str) -> str:
-    return re.sub(r"_u[0-9A-E]{4}", lambda m: parse_hex_unicode(m.group()[1:]), elt)
+    return re.sub(r"_[uU][0-9A-E]{4}", lambda m: parse_hex_unicode(m.group()[1:]), elt)
 
 
 def clean_fact_unicode(fact: Fact) -> Fact:
@@ -69,11 +71,21 @@ def clean_fact_wiki_id(fact: Fact) -> Fact:
     return (clean_wiki_id(subj), rel, clean_wiki_id(obj), ts)
 
 
+def clean_generic_instance(elt: str) -> str:
+    return re.sub(r" ?generic instance", "", elt, flags=re.IGNORECASE)
+
+
+def clean_fact_generic_instance(fact: Fact) -> Fact:
+    subj, rel, obj, ts = fact
+    return (clean_generic_instance(subj), rel, clean_generic_instance(obj), ts)
+
+
 def format_fact(fact: Fact) -> Fact:
     fact = clean_fact_prefix(fact)
     fact = clean_fact_unicode(fact)
     fact = clean_fact_wiki_id(fact)
     fact = clean_fact_underscore(fact)
+    fact = clean_fact_generic_instance(fact)
     return fact
 
 
@@ -109,30 +121,8 @@ def group_related_facts(
     return [c for c in flatten(clusters) if len(c) >= min_size]
 
 
-YAGO_REL_DESC: Optional[dict[str, str]] = None
-
-
-def get_relation_desc(rel: str) -> Optional[str]:
-    global YAGO_REL_DESC
-
-    if YAGO_REL_DESC is None:
-        YAGO_REL_DESC = {}
-        directory = os.path.dirname(__file__)
-        with open(f"{directory}/yago_rel_desc.csv") as f:
-            for line in f:
-                try:
-                    rel, desc = line.rstrip("\n").split(",")
-                    YAGO_REL_DESC[rel] = desc
-                except ValueError:
-                    continue
-
-    return YAGO_REL_DESC.get(rel)
-
-
-def gen_multifacts_description(
-    fact_groups: List[List[Fact]], pipe: Pipeline, batch_size: int = 4
-) -> List[str]:
-    prompt = """Given the following events represented as quadruplets of the form (subject, relation, object, timestamp):
+def _get_multifact_prompt(fact_group: list[Fact]) -> str:
+    prompt_template = """Given the following events represented as quadruplets of the form (subject, relation, object, timestamp):
     {}
     and the following definitions for the relations:
     {}
@@ -140,7 +130,34 @@ def gen_multifacts_description(
     You can add additional details, but the entirety of the information in the given quadruplets must be preserved. 
     Do NOT add any additional information or text: you must only generate the description.
     """
+    formatted_facts = [format_fact(fact) for fact in fact_group]
+    formatted_facts = [randomize_fact_ts_style(fact) for fact in formatted_facts]
 
+    relations = {rel for _, rel, _, _ in formatted_facts}
+
+    current_date = None
+    if random.random() < 0.25:
+        dates = sorted(
+            [datetime.strptime(ts, "%Y-%m-%d") for _, _, _, ts in fact_group]
+        )
+        min_date = dates[0] - timedelta(days=random.randint(0, 7))
+        max_date = dates[0] + timedelta(days=random.randint(0, 7))
+        delta = max_date - min_date
+        current_date = min_date + timedelta(random.randint(0, delta.days))
+        current_date = randomize_ts_style(current_date)
+
+    if not current_date is None:
+        prompt_template += f"The current date is {current_date}. In addition to the date of the event, indicate the current date at the top of your text as part of a news headline."
+
+    return prompt_template.format(
+        "\n".join(str(fact) for fact in formatted_facts),
+        "\n".join(f"{rel}: {YAGO_REL_DESC.get(rel)}" for rel in relations),
+    )
+
+
+def gen_multifacts_description(
+    fact_groups: List[List[Fact]], pipe: Pipeline, batch_size: int = 4
+) -> List[str]:
     messages = [
         [
             {
@@ -149,13 +166,7 @@ def gen_multifacts_description(
             },
             {
                 "role": "user",
-                "content": prompt.format(
-                    "\n".join(str(format_fact(fact)) for fact in fact_group),
-                    "\n".join(
-                        f"{fact[1]}: {get_relation_desc(fact[1])}"
-                        for fact in fact_group
-                    ),
-                ),
+                "content": _get_multifact_prompt(fact_group),
             },
         ]
         for fact_group in fact_groups
@@ -179,6 +190,52 @@ def gen_multifact_description(fact_group: List[Fact], pipe: Pipeline) -> str:
     return gen_multifacts_description([fact_group], pipe)[0]
 
 
+def ts_day_ordinal(day: int) -> str:
+    ord_suffix = (
+        "th" if 10 <= day <= 20 else {1: "st", 2: "nd", 3: "rd"}.get(day % 10, "th")
+    )
+    return str(day) + ord_suffix
+
+
+def randomize_ts_style(d: datetime) -> str:
+    day_style = random.choice(["%B ~d, %Y", "%Y-%m-%d"])
+    weekday_style = random.choice(["%A, ", "%a, ", ""])
+    style = weekday_style + day_style
+    return d.strftime(style).replace("~d", ts_day_ordinal(d.day))
+
+
+def randomize_fact_ts_style(fact: Fact) -> Fact:
+    subj, rel, obj, ts = fact
+    d = datetime.strptime(ts, "%Y-%m-%d")
+    new_ts = randomize_ts_style(d)
+    return (subj, rel, obj, new_ts)
+
+
+def _get_fact_prompt(fact: Fact) -> str:
+    formatted_fact = format_fact(fact)
+
+    formatted_fact = randomize_fact_ts_style(formatted_fact)
+    current_date = None
+    if random.random() < 0.25:
+        d = datetime.strptime(fact[3], "%Y-%m-%d")
+        current_date = d + timedelta(days=random.randint(-7, 7))
+        current_date = randomize_ts_style(current_date)
+
+    formatted_relation = formatted_fact[1]
+
+    prompt = f"""Given the following event represented as a quadruplet of the form (subject, relation, object, timestamp):
+    {formatted_fact},
+    The following definition for the {formatted_relation} relation:
+    {YAGO_REL_DESC.get(formatted_relation)},
+    Generate a one to three sentences description text for this event, in the style of a newspaper.
+    You can add additional details, but the entirety of the information in the given quadruplet must be preserved. 
+    Do NOT add any additional information or text: you must only generate the description.
+    """
+    if not current_date is None:
+        prompt += f"The current date is {current_date}. In addition to the date of the event, indicate the current date at the top of your text as part of a news headline."
+    return prompt
+
+
 def gen_facts_description(
     facts: List[Fact], pipe: Pipeline, batch_size: int = 4
 ) -> List[str]:
@@ -188,25 +245,13 @@ def gen_facts_description(
     :param facts: quadruples for which to generate a description
     :param pipe: huggingface text-generation pipeline
     """
-    prompt = """Given the following event represented as a quadruplet of the form (subject, relation, object, timestamp):
-    {}
-    and the following definition for the relation:
-    {}
-    Generate a one to three sentences description text for this event, in the style of a newspaper.
-    You can add additional details, but the entirety of the information in the given quadruplet must be preserved. 
-    Do NOT add any additional information or text: you must only generate the description.
-    """
-
     messages = [
         [
             {
                 "role": "system",
                 "content": "You are a generation model that is expert at outputting description of events.",
             },
-            {
-                "role": "user",
-                "content": prompt.format(format_fact(fact), get_relation_desc(fact[1])),
-            },
+            {"role": "user", "content": _get_fact_prompt(fact)},
         ]
         for fact in facts
     ]
