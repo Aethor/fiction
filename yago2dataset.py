@@ -170,7 +170,7 @@ def linearize_facts(
             if ts != "":
                 linearized_facts.append((subj, rel, obj, ts))
         elif not ":" in ts:
-            linearized_facts.append((subj, rel, obj, ts))
+            linearized_facts.append((subj, update_rel(rel, "start"), obj, ts))
         elif ts.endswith(":"):
             linearized_facts.append((subj, update_rel(rel, "start"), obj, ts[:-1]))
         elif ts.startswith(":"):
@@ -178,7 +178,7 @@ def linearize_facts(
         else:
             start, end = ts.split(":")
             if start == end:
-                linearized_facts.append((subj, rel, obj, start))
+                linearized_facts.append((subj, update_rel(rel, "start"), obj, start))
             else:
                 linearized_facts.append((subj, update_rel(rel, "start"), obj, start))
                 linearized_facts.append((subj, update_rel(rel, "end"), obj, end))
