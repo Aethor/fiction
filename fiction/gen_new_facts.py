@@ -340,6 +340,13 @@ if __name__ == "__main__":
             )
 
             new_facts += local_new_facts
+
+            # save on disk to ensure that, even if the program
+            # crashes, we have a partial dataset
+            with open(args.output_file, "w") as f:
+                for subj, rel, obj, ts in new_facts:
+                    f.write(f"{subj}\t{rel}\t{obj}\t{ts}\n")
+
             # extend fact_dataset with the new generated facts so that
             # they can be used in new preditions
             fact_dataset.test_facts += local_new_facts
@@ -347,7 +354,3 @@ if __name__ == "__main__":
                 fact_dataset.ts2id[ts] = max(fact_dataset.ts2id.values()) + 1
 
             d = d + timedelta(days=1)
-
-    with open(args.output_file, "w") as f:
-        for subj, rel, obj, ts in new_facts:
-            f.write(f"{subj}\t{rel}\t{obj}\t{ts}\n")
