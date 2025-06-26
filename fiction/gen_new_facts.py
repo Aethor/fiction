@@ -1,5 +1,5 @@
 from typing import Literal, Optional, Tuple, List, Dict, TypeVar
-from datetime import date, timedelta
+from datetime import date, timedelta, datetime
 import pathlib as pl
 import json, random, re, argparse
 import numpy as np
@@ -11,7 +11,7 @@ from fiction.tlogic.score_functions import score_12
 from fiction.tlogic.temporal_walk import store_edges
 from fiction.yagottl.TurtleUtils import YagoDBInfo
 from fiction.yagottl.schema import is_rel_allowed, is_obj_allowed
-from fiction.utils import FactDataset, load_fact_dataset
+from fiction.utils import FactDataset, load_fact_dataset, load_facts
 
 # (subj, rel, obj, ts)
 Fact = Tuple[str, str, str, str]
@@ -306,6 +306,12 @@ if __name__ == "__main__":
         help="File where new facts will be dumped, one per line.",
     )
     parser.add_argument(
+        "-s",
+        "--restart-from-output",
+        action="store_true",
+        help="if specified, restart generation from --output-file. Useful to restart a crashed generation process.",
+    )
+    parser.add_argument(
         "-e", "--year", type=int, help="Year for which to generate new facts."
     )
     parser.add_argument(
@@ -328,8 +334,17 @@ if __name__ == "__main__":
     db_info = YagoDBInfo.from_yago_dir(args.yago_dir)
 
     subj_entities = list(fact_dataset.subj_entities())
-    new_facts = []
-    d = date(args.year, 1, 1)
+
+    if args.restart_from_output:
+        new_facts = load_facts(args.output_file, f"loading {args.output_file}")
+        last_ts = new_facts[-1][3]
+        d = datetime.strptime(last_ts, "%Y-%m-%d").date()
+        assert d.year == args.year
+        print(f"restarting from {args.output_file} (last known date: {d})")
+        d = d + timedelta(days=1)  # start from next day
+    else:
+        new_facts = []
+        d = date(args.year, 1, 1)
 
     with Parallel(n_jobs=args.process_nb, return_as="generator_unordered") as parallel:
         while d.year < args.year + 1:
