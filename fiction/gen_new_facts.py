@@ -1,8 +1,10 @@
-from typing import Literal, Optional, Tuple, List, Dict, TypeVar
+from typing import Literal, Optional, TypeVar
 from datetime import date, timedelta, datetime
+from collections import Counter
 import pathlib as pl
 import json, random, re, argparse
 import numpy as np
+from more_itertools import flatten
 from joblib import Parallel, delayed
 from fiction.tlogic.apply import apply_rules
 from fiction.tlogic.grapher import Grapher
@@ -14,16 +16,16 @@ from fiction.yagottl.schema import is_rel_allowed, is_obj_allowed
 from fiction.utils import FactDataset, load_fact_dataset, load_facts
 
 # (subj, rel, obj, ts)
-Fact = Tuple[str, str, str, str]
+Fact = tuple[str, str, str, str]
 
 # (subj, rel, ?, ts)
-Query = Tuple[str, str, Literal["?"], str]
+Query = tuple[str, str, Literal["?"], str]
 
 # [(obj, score), ...]
-QueryOutput = List[Tuple[str, float]]
+QueryOutput = list[tuple[str, float]]
 
 
-def load_rules(path: pl.Path, rule_lengths: List[int]) -> Dict[int, dict]:
+def load_rules(path: pl.Path, rule_lengths: list[int]) -> dict[int, dict]:
     with open(path) as f:
         rules_dict = json.load(f)
     rules_dict = {int(k): v for k, v in rules_dict.items()}
@@ -34,7 +36,7 @@ def load_rules(path: pl.Path, rule_lengths: List[int]) -> Dict[int, dict]:
 
 
 def make_grapher(
-    queries: List[Query], fact_dataset: FactDataset, updated_ts2id: Dict[str, int]
+    queries: list[Query], fact_dataset: FactDataset, updated_ts2id: dict[str, int]
 ) -> Grapher:
     grapher = Grapher.__new__(Grapher)
     grapher.dataset_dir = None
@@ -65,9 +67,9 @@ def make_grapher(
     return grapher
 
 
-def query(
-    queries: List[Query], rules: Dict[int, dict], fact_dataset: FactDataset
-) -> List[QueryOutput]:
+def query_tlogic(
+    queries: list[Query], rules: dict[int, dict], fact_dataset: FactDataset
+) -> list[QueryOutput]:
     if len(queries) == 0:
         return []
 
@@ -118,13 +120,13 @@ def query(
 T = TypeVar("T")
 
 
-def maybe_max(lst: List[T], **kwargs) -> Optional[T]:
+def maybe_max(lst: list[T], **kwargs) -> Optional[T]:
     if len(lst) == 0:
         return None
     return max(lst, **kwargs)
 
 
-def rel_is_active(rel: str, entity_facts: List[Fact]) -> bool:
+def rel_is_active(rel: str, entity_facts: list[Fact]) -> bool:
     latest_start = maybe_max([f[3] for f in entity_facts if f[1] == rel])
     if latest_start is None:
         return False
@@ -164,50 +166,58 @@ def is_fact_valid(fact: Fact, db_info: YagoDBInfo) -> bool:
 
 
 def prepare_queries(
-    subj: str, fact_dataset: FactDataset, db_info: YagoDBInfo
-) -> List[Query]:
-    rel_candidates: List[str] = []
+    rel: str, fact_dataset: FactDataset, db_info: YagoDBInfo, max_queries: int = 50
+) -> list[Query]:
+    subjects = list(fact_dataset.subj_entities())
+    random.shuffle(subjects)
 
-    subj_facts = [f for f in fact_dataset.all_facts() if f[0] == subj]
-    for rel in fact_dataset.rel2id:
+    subject_candidates = []
+
+    for subj in subjects:
+        if len(subject_candidates) == max_queries:
+            break
+
         # NOTE: we pre-validate the (subj, rel) pair to optimize the
         # number of queries
         if not is_rel_allowed(subj, unlinearize_rel(rel), db_info):
             continue
+
+        subj_facts = [f for f in fact_dataset.all_facts() if f[0] == subj]
         if rel.startswith("start"):
             if not rel_is_active(rel, subj_facts):
-                rel_candidates.append(rel)
+                subject_candidates.append(subj)
         elif rel.startswith("end"):
             if rel_is_active(rel, subj_facts):
-                rel_candidates.append(rel)
+                subject_candidates.append(subj)
         else:
-            rel_candidates.append(rel)
+            subject_candidates.append(subj)
 
-    return [(subj, rel, "?", ts) for rel in rel_candidates]
+    return [(subj, rel, "?", ts) for subj in subject_candidates]
 
 
 def filter_query_answers(
-    answers: List[QueryOutput], queries: List[Query], db_info: YagoDBInfo
+    answers: list[QueryOutput], queries: list[Query], db_info: YagoDBInfo
 ) -> Optional[Fact]:
-    # transform each (obj, score) couple into fact
+    # transform each (obj, score) couple into (fact, score)
     obj_candidates = [
-        [(query[0], query[1], obj, query[3]) for obj, _ in candidates]
+        [((query[0], query[1], obj, query[3]), score) for obj, score in candidates]
         for candidates, query in zip(answers, queries)
     ]
     # filter and keep only valid facts
     obj_candidates = [
-        [fact for fact in candidates if is_fact_valid(fact, db_info)]
+        [(fact, score) for fact, score in candidates if is_fact_valid(fact, db_info)]
         for candidates in obj_candidates
     ]
     obj_candidates = [c for c in obj_candidates if len(c) > 0]
     if len(obj_candidates) == 0 or all(len(ans) == 0 for ans in answers):
         return None
-    return random.choice(obj_candidates)[0]
+    return max(flatten(obj_candidates), key=lambda fact_and_score: fact_and_score[1])[0]
 
 
 def sample_new_facts(
     ts: str,
     facts_per_day: int,
+    rel_probs: dict[str, float],
     rules: dict,
     fact_dataset: FactDataset,
     db_info: YagoDBInfo,
@@ -227,27 +237,28 @@ def sample_new_facts(
     if parallel.n_jobs > 1:
         margin = int(1 / 3 * facts_per_day)
 
-    subj_entities = fact_dataset.subj_entities()
-
     new_facts = []
     tries_nb = 0
     while len(new_facts) < facts_per_day or tries_nb > max_tries_nb:
         to_gen_nb = facts_per_day - len(new_facts) + margin
-        subjects = random.sample(list(subj_entities), k=to_gen_nb)
+
+        relations = random.choices(
+            list(fact_dataset.rel2id.keys()),
+            [rel_probs[rel] for rel in fact_dataset.rel2id.keys()],
+            k=to_gen_nb,
+        )
 
         # We have to cut processing in 3 steps. Steps 1 and 3 cant be
         # parallelized with joblib since that would require copying
         # db_info, which is way too large.
         # 1. preparation
-        subject_queries = [
-            prepare_queries(subj, fact_dataset, db_info) for subj in subjects
-        ]
+        queries = [prepare_queries(rel, fact_dataset, db_info) for rel in relations]
         # 2. TLogic query
         query_answers = parallel(
-            delayed(query)(subject_queries[i], rules, fact_dataset)
+            delayed(query_tlogic)(queries[i], rules, fact_dataset)
             for i in range(to_gen_nb)
         )
-        for answers, queries in zip(query_answers, subject_queries):
+        for answers, queries in zip(query_answers, queries):
             # 3. filtering: we keep only valid candidates according to
             # db_info
             new_fact = filter_query_answers(answers, queries, db_info)
@@ -255,9 +266,6 @@ def sample_new_facts(
                 continue
 
             new_facts.append(new_fact)
-            # we don't want to generate another fact with the same
-            # subject for that day
-            subj_entities.remove(new_fact[0])
             print(f"({len(new_facts)}/{facts_per_day}) {new_fact}")
 
             # we don't need to generate new facts anymore: cancel
@@ -312,13 +320,13 @@ if __name__ == "__main__":
         help="if specified, restart generation from --output-file. Useful to restart a crashed generation process.",
     )
     parser.add_argument(
-        "-e", "--year", type=int, help="Year for which to generate new facts."
+        "-y",
+        "--distribution-year",
+        type=int,
+        help="year of the past dataset to use as an inspiration when generating the dataset. Number of facts per day will be the same as that year. Relations will be sampled according to the distribution of relations that year.",
     )
     parser.add_argument(
-        "-n",
-        "--facts-per-day",
-        type=int,
-        help="Number of facts to generate for each day of the given year.",
+        "-e", "--year", type=int, help="Year for which to generate new facts."
     )
     parser.add_argument(
         "-p",
@@ -346,12 +354,39 @@ if __name__ == "__main__":
         new_facts = []
         d = date(args.year, 1, 1)
 
+    # facts for the year for which we are trying to copy distribution. We copy:
+    # - the number of facts per day of that year
+    # - the relationship distribution for that year
+    distribution_year_facts = [
+        fact
+        for fact in fact_dataset.all_facts()
+        if datetime.strptime(fact[3], "%Y-%m-%d").year == args.distribution_year
+    ]
+    rel_counter = Counter(rel for _, rel, _, _ in fact_dataset.all_facts())
+    max_counter = max(rel_counter.values())
+    rel_probs = {rel: counter / max_counter for rel, counter in rel_counter.items()}
+
     with Parallel(n_jobs=args.process_nb, return_as="generator_unordered") as parallel:
         while d.year < args.year + 1:
             ts = d.strftime("%Y-%m-%d")
 
+            facts_per_day = len(
+                [
+                    fact
+                    for fact in distribution_year_facts
+                    if datetime.strptime(fact[3], "%Y-%m-%d").day == d.day
+                ]
+            )
+
             local_new_facts = sample_new_facts(
-                ts, args.facts_per_day, rules, fact_dataset, db_info, 10, parallel
+                ts,
+                facts_per_day,
+                rel_probs,
+                rules,
+                fact_dataset,
+                db_info,
+                10,
+                parallel,
             )
 
             new_facts += local_new_facts
