@@ -401,13 +401,7 @@ if __name__ == "__main__":
         while d.year < args.year + 1:
             ts = d.strftime("%Y-%m-%d")
 
-            facts_per_day = len(
-                [
-                    fact
-                    for fact in mimic_year_facts
-                    if datetime.strptime(fact[3], "%Y-%m-%d").day == d.day
-                ]
-            )
+            facts_per_day = len([fact for fact in mimic_year_facts if fact[3] == ts])
             facts_per_day = min(128, facts_per_day)
 
             local_new_facts = sample_new_facts(
