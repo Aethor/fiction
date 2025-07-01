@@ -5,6 +5,7 @@ import pathlib as pl
 import json, random, re, argparse
 import numpy as np
 from more_itertools import flatten
+from tqdm import tqdm
 from joblib import Parallel, delayed
 from fiction.tlogic.apply import apply_rules
 from fiction.tlogic.grapher import Grapher
@@ -239,6 +240,7 @@ def sample_new_facts(
 
     new_facts = []
     tries_nb = 0
+    progress = tqdm(total=facts_per_day, ascii=True)
     while len(new_facts) < facts_per_day or tries_nb > max_tries_nb:
         to_gen_nb = facts_per_day - len(new_facts) + margin
 
@@ -270,7 +272,8 @@ def sample_new_facts(
                 continue
 
             new_facts.append(new_fact)
-            print(f"({len(new_facts)}/{facts_per_day}) {new_fact}")
+            progress.update()
+            tqdm.write(str(new_fact))
 
             # we don't need to generate new facts anymore: cancel
             # remaining workers (will generate a warning the first
