@@ -299,6 +299,7 @@ def sample_new_facts(
             if len(new_facts) == facts_per_day:
                 break
 
+        del query_answers
         tries_nb += 1
 
     if tries_nb > max_tries_nb:
