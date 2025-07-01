@@ -166,33 +166,31 @@ def is_fact_valid(fact: Fact, db_info: YagoDBInfo) -> bool:
 
 
 def prepare_queries(
-    rel: str, fact_dataset: FactDataset, db_info: YagoDBInfo, max_queries: int = 8
+    rel: str,
+    subj_facts: dict[str, list[Fact]],
+    db_info: YagoDBInfo,
+    max_queries: int = 4,
 ) -> list[Query]:
-    subjects = list(fact_dataset.subj_entities())
-    random.shuffle(subjects)
-
-    subj_facts = defaultdict(list)
-    for fact in fact_dataset.all_facts():
-        subj = fact[0]
-        subj_facts[subj].append(fact)
+    subjects = list(subj_facts.keys())
 
     subject_candidates = []
+    while len(subject_candidates) < max_queries and len(subjects) > 0:
+        # we sample the index here to efficiently remove subj from
+        # subjects later.
+        subj_i = random.randrange(0, len(subjects))
+        subj = subjects[subj_i]
 
-    for subj in subjects:
-        if len(subject_candidates) == max_queries:
-            break
-
-        if not is_rel_allowed(subj, unlinearize_rel(rel), db_info):
-            continue
-
-        if rel.startswith("start"):
-            if not rel_is_active(rel, subj_facts[subj]):
+        if is_rel_allowed(subj, unlinearize_rel(rel), db_info):
+            if rel.startswith("start"):
+                if not rel_is_active(rel, subj_facts[subj]):
+                    subject_candidates.append(subj)
+            elif rel.startswith("end"):
+                if rel_is_active(rel, subj_facts[subj]):
+                    subject_candidates.append(subj)
+            else:
                 subject_candidates.append(subj)
-        elif rel.startswith("end"):
-            if rel_is_active(rel, subj_facts[subj]):
-                subject_candidates.append(subj)
-        else:
-            subject_candidates.append(subj)
+
+        subjects.pop(subj_i)
 
     return [(subj, rel, "?", ts) for subj in subject_candidates]
 
@@ -254,16 +252,25 @@ def sample_new_facts(
         # parallelized with joblib since that would require copying
         # db_info, which is way too large.
         # 1. preparation
-        queries = [prepare_queries(rel, fact_dataset, db_info) for rel in relations]
+        subj_facts = defaultdict(list)
+        for fact in fact_dataset.all_facts():
+            subj = fact[0]
+            subj_facts[subj].append(fact)
+        from tqdm import tqdm
+
+        queries = [
+            prepare_queries(rel, subj_facts, db_info)
+            for rel in tqdm(relations, ascii=True)
+        ]
         # 2. TLogic query
         query_answers = parallel(
             delayed(query_tlogic)(queries[i], rules, fact_dataset)
             for i in range(to_gen_nb)
         )
-        for answers, queries in zip(query_answers, queries):
+        for answers, rel_queries in zip(query_answers, queries):
             # 3. filtering: we keep only valid candidates according to
             # db_info
-            new_fact = filter_query_answers(answers, queries, db_info)
+            new_fact = filter_query_answers(answers, rel_queries, db_info)
             if new_fact is None:
                 continue
 
