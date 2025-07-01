@@ -402,7 +402,7 @@ if __name__ == "__main__":
                     if datetime.strptime(fact[3], "%Y-%m-%d").day == d.day
                 ]
             )
-            facts_per_day = max(128, facts_per_day)
+            facts_per_day = min(128, facts_per_day)
 
             local_new_facts = sample_new_facts(
                 ts,
