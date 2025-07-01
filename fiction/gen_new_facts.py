@@ -1,6 +1,6 @@
 from typing import Literal, Optional, TypeVar
 from datetime import date, timedelta, datetime
-from collections import Counter
+from collections import Counter, defaultdict
 import pathlib as pl
 import json, random, re, argparse
 import numpy as np
@@ -166,10 +166,15 @@ def is_fact_valid(fact: Fact, db_info: YagoDBInfo) -> bool:
 
 
 def prepare_queries(
-    rel: str, fact_dataset: FactDataset, db_info: YagoDBInfo, max_queries: int = 50
+    rel: str, fact_dataset: FactDataset, db_info: YagoDBInfo, max_queries: int = 8
 ) -> list[Query]:
     subjects = list(fact_dataset.subj_entities())
     random.shuffle(subjects)
+
+    subj_facts = defaultdict(list)
+    for fact in fact_dataset.all_facts():
+        subj = fact[0]
+        subj_facts[subj].append(fact)
 
     subject_candidates = []
 
@@ -177,17 +182,14 @@ def prepare_queries(
         if len(subject_candidates) == max_queries:
             break
 
-        # NOTE: we pre-validate the (subj, rel) pair to optimize the
-        # number of queries
         if not is_rel_allowed(subj, unlinearize_rel(rel), db_info):
             continue
 
-        subj_facts = [f for f in fact_dataset.all_facts() if f[0] == subj]
         if rel.startswith("start"):
-            if not rel_is_active(rel, subj_facts):
+            if not rel_is_active(rel, subj_facts[subj]):
                 subject_candidates.append(subj)
         elif rel.startswith("end"):
-            if rel_is_active(rel, subj_facts):
+            if rel_is_active(rel, subj_facts[subj]):
                 subject_candidates.append(subj)
         else:
             subject_candidates.append(subj)
