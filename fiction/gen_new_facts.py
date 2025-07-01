@@ -244,7 +244,7 @@ def sample_new_facts(
 
         relations = random.choices(
             list(fact_dataset.rel2id.keys()),
-            [rel_probs[rel] for rel in fact_dataset.rel2id.keys()],
+            [rel_probs.get(rel, 0) for rel in fact_dataset.rel2id.keys()],
             k=to_gen_nb,
         )
 
