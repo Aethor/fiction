@@ -345,10 +345,10 @@ if __name__ == "__main__":
         help="if specified, restart generation from --output-file. Useful to restart a crashed generation process.",
     )
     parser.add_argument(
-        "-i",
-        "--distribution-year",
+        "-m",
+        "--mimic-year",
         type=int,
-        help="year of the past dataset to use as an inspiration when generating the dataset. Number of facts per day will be the same as that year. Relations will be sampled according to the distribution of relations that year.",
+        help="year of the past dataset to use as an inspiration when generating the dataset. Number of facts per day will be the same as that year (up to 128 days). Relations will be sampled according to the distribution of relations that year.",
     )
     parser.add_argument(
         "-e", "--year", type=int, help="Year for which to generate new facts."
@@ -379,13 +379,13 @@ if __name__ == "__main__":
         new_facts = []
         d = date(args.year, 1, 1)
 
-    # facts for the year for which we are trying to copy distribution. We copy:
+    # facts for the year we are trying to mimic. We copy:
     # - the number of facts per day of that year
     # - the relationship distribution for that year
-    distribution_year_facts = [
+    mimic_year_facts = [
         fact
         for fact in fact_dataset.all_facts()
-        if datetime.strptime(fact[3], "%Y-%m-%d").year == args.distribution_year
+        if datetime.strptime(fact[3], "%Y-%m-%d").year == args.mimic_year
     ]
     rel_counter = Counter(rel for _, rel, _, _ in fact_dataset.all_facts())
     max_counter = max(rel_counter.values())
@@ -398,10 +398,11 @@ if __name__ == "__main__":
             facts_per_day = len(
                 [
                     fact
-                    for fact in distribution_year_facts
+                    for fact in mimic_year_facts
                     if datetime.strptime(fact[3], "%Y-%m-%d").day == d.day
                 ]
             )
+            facts_per_day = max(128, facts_per_day)
 
             local_new_facts = sample_new_facts(
                 ts,
