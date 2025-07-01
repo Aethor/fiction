@@ -2,6 +2,7 @@ from typing import Any, List, Optional, Tuple
 import json
 import pathlib as pl
 from dataclasses import dataclass
+from collections import defaultdict
 import numpy as np
 
 Fact = Tuple[str, str, str, str]
@@ -57,6 +58,13 @@ class FactDataset:
 
     def obj_entities(self) -> set[str]:
         return {f[2] for f in self.all_facts()}
+
+    def subj_facts(self) -> dict[str, list[Fact]]:
+        subj_facts = defaultdict(list)
+        for fact in self.all_facts():
+            subj = fact[0]
+            subj_facts[subj].append(fact)
+        return subj_facts
 
     def map_to_idx(self) -> np.ndarray:
         facts = self.all_facts()

@@ -264,11 +264,17 @@ def sample_new_facts(
         # parallelized with joblib since that would require copying
         # db_info, which is way too large.
         # 1. preparation
-        subj_facts = defaultdict(list)
-        for fact in fact_dataset.all_facts():
-            subj = fact[0]
-            subj_facts[subj].append(fact)
-        queries = [prepare_queries(rel, subj_facts, db_info) for rel in relations]
+        subj_facts = fact_dataset.subj_facts()  # { subject => [fact, ...]}
+        queries = []
+        for rel in relations:
+            rel_queries = prepare_queries(rel, subj_facts, db_info)
+            queries.append(rel_queries)
+            for rel_query in rel_queries:
+                subj = rel_query[0]
+                # make sure we don't generate two facts for the same
+                # subject on the same day - this avoids generating
+                # contradictory facts
+                del subj_facts[subj]
         # 2. TLogic query
         # OPTIM: we precompute train_idx for make_grapher, see query_tlogic.
         _train_idx = fact_dataset.map_to_idx()
