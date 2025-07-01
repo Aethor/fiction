@@ -376,6 +376,11 @@ if __name__ == "__main__":
         assert d.year == args.year
         print(f"restarting from {args.output_file} (last known date: {d})")
         d = d + timedelta(days=1)  # start from next day
+        # update fact_dataset
+        fact_dataset.test_facts += new_facts
+        for _, _, _, ts in new_facts:
+            if not ts in fact_dataset.ts2id:
+                fact_dataset.ts2id[ts] = max(fact_dataset.ts2id.values()) + 1
     else:
         new_facts = []
         d = date(args.year, 1, 1)
