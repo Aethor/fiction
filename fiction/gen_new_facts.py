@@ -37,7 +37,10 @@ def load_rules(path: pl.Path, rule_lengths: list[int]) -> dict[int, dict]:
 
 
 def make_grapher(
-    queries: list[Query], fact_dataset: FactDataset, updated_ts2id: dict[str, int]
+    queries: list[Query],
+    fact_dataset: FactDataset,
+    updated_ts2id: dict[str, int],
+    _train_idx: Optional[np.ndarray] = None,
 ) -> Grapher:
     grapher = Grapher.__new__(Grapher)
     grapher.dataset_dir = None
@@ -60,16 +63,23 @@ def make_grapher(
     for i in range(num_relations, num_relations * 2):
         grapher.inv_relation_id[i] = i % num_relations
 
-    grapher.train_idx = grapher.add_inverses(
-        grapher.map_to_idx(fact_dataset.all_facts())
-    )
+    if _train_idx is None:
+        grapher.train_idx = grapher.add_inverses(
+            grapher.map_to_idx(fact_dataset.all_facts())
+        )
+    else:
+        grapher.train_idx = grapher.add_inverses(_train_idx)
+
     grapher.test_idx = grapher.add_inverses(grapher.map_to_idx(queries))
     grapher.all_idx = np.vstack((grapher.train_idx, grapher.test_idx))
     return grapher
 
 
 def query_tlogic(
-    queries: list[Query], rules: dict[int, dict], fact_dataset: FactDataset
+    queries: list[Query],
+    rules: dict[int, dict],
+    fact_dataset: FactDataset,
+    _train_idx: Optional[np.ndarray] = None,
 ) -> list[QueryOutput]:
     if len(queries) == 0:
         return []
@@ -84,7 +94,7 @@ def query_tlogic(
             i += 1
             updated_ts2id[ts] = max_ts_id + i
 
-    grapher = make_grapher(queries, fact_dataset, updated_ts2id)
+    grapher = make_grapher(queries, fact_dataset, updated_ts2id, _train_idx)
 
     id2entity = {v: k for k, v in fact_dataset.entity2id.items()}
     window = 0
@@ -260,8 +270,10 @@ def sample_new_facts(
             subj_facts[subj].append(fact)
         queries = [prepare_queries(rel, subj_facts, db_info) for rel in relations]
         # 2. TLogic query
+        # OPTIM: we precompute train_idx for make_grapher, see query_tlogic.
+        _train_idx = fact_dataset.map_to_idx()
         query_answers = parallel(
-            delayed(query_tlogic)(queries[i], rules, fact_dataset)
+            delayed(query_tlogic)(queries[i], rules, fact_dataset, _train_idx)
             for i in range(to_gen_nb)
         )
         for answers, rel_queries in zip(query_answers, queries):
