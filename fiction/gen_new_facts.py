@@ -320,7 +320,7 @@ if __name__ == "__main__":
         help="if specified, restart generation from --output-file. Useful to restart a crashed generation process.",
     )
     parser.add_argument(
-        "-y",
+        "-i",
         "--distribution-year",
         type=int,
         help="year of the past dataset to use as an inspiration when generating the dataset. Number of facts per day will be the same as that year. Relations will be sampled according to the distribution of relations that year.",
