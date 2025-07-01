@@ -256,12 +256,7 @@ def sample_new_facts(
         for fact in fact_dataset.all_facts():
             subj = fact[0]
             subj_facts[subj].append(fact)
-        from tqdm import tqdm
-
-        queries = [
-            prepare_queries(rel, subj_facts, db_info)
-            for rel in tqdm(relations, ascii=True)
-        ]
+        queries = [prepare_queries(rel, subj_facts, db_info) for rel in relations]
         # 2. TLogic query
         query_answers = parallel(
             delayed(query_tlogic)(queries[i], rules, fact_dataset)
