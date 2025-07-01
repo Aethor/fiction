@@ -393,6 +393,9 @@ if __name__ == "__main__":
         for fact in fact_dataset.all_facts()
         if datetime.strptime(fact[3], "%Y-%m-%d").year == args.mimic_year
     ]
+    mimic_year_dates = [
+        datetime.strptime(ts, "%Y-%m-%d") for _, _, _, ts in mimic_year_facts
+    ]
     rel_counter = Counter(rel for _, rel, _, _ in fact_dataset.all_facts())
     max_counter = max(rel_counter.values())
     rel_probs = {rel: counter / max_counter for rel, counter in rel_counter.items()}
@@ -401,7 +404,10 @@ if __name__ == "__main__":
         while d.year < args.year + 1:
             ts = d.strftime("%Y-%m-%d")
 
-            facts_per_day = len([fact for fact in mimic_year_facts if fact[3] == ts])
+            facts_per_day = sum(
+                mimic_year_d.day == d.day and mimic_year_d.month == d.month
+                for mimic_year_d in mimic_year_dates
+            )
             facts_per_day = min(128, facts_per_day)
 
             local_new_facts = sample_new_facts(
