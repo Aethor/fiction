@@ -26,12 +26,20 @@ Query = tuple[str, str, Literal["?"], str]
 QueryOutput = list[tuple[str, float]]
 
 
-def load_rules(path: pl.Path, rule_lengths: list[int]) -> dict[int, dict]:
+def load_rules(
+    path: pl.Path,
+    rule_lengths: list[int],
+    min_conf: float = 0.0,
+    min_body_supp: int = 1,
+) -> dict[int, dict]:
     with open(path) as f:
         rules_dict = json.load(f)
     rules_dict = {int(k): v for k, v in rules_dict.items()}
     rules_dict = ra.filter_rules(
-        rules_dict, min_conf=0.01, min_body_supp=2, rule_lengths=rule_lengths
+        rules_dict,
+        min_conf=min_conf,
+        min_body_supp=min_body_supp,
+        rule_lengths=rule_lengths,
     )
     return rules_dict
 
@@ -363,7 +371,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    rules = load_rules(args.rules, args.rule_lengths)
+    rules = load_rules(args.rules, args.rule_lengths, min_conf=0, min_body_supp=1)
     fact_dataset = load_fact_dataset(args.dataset_dir)
     db_info = YagoDBInfo.from_yago_dir(args.yago_dir)
 
