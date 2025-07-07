@@ -367,7 +367,7 @@ if __name__ == "__main__":
                             "object": fact[2],
                             "timestamp": fact[3],
                         }
-                        for fact in fact_groups
+                        for fact in fact_group
                     ],
                     "description": desc,
                 }
