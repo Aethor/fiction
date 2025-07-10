@@ -156,7 +156,7 @@ def _get_multifact_prompt(fact_group: list[Fact]) -> str:
 
 
 def gen_multifacts_description(
-    fact_groups: List[List[Fact]], pipe: Pipeline, batch_size: int = 4
+    fact_groups: List[List[Fact]], pipe: Pipeline, batch_size: int = 8
 ) -> List[str]:
     messages = [
         [
@@ -173,17 +173,36 @@ def gen_multifacts_description(
     ]
 
     descriptions = []
-    for message, fact in tqdm(zip(messages, facts), total=len(messages)):
-        year = str(datetime.strptime(fact[3], "%Y-%m-%d").year)
-        desc = ""
-        while not year in desc:
+    for i in tqdm(range(0, len(messages), batch_size)):
+        batch = messages[i : i + batch_size]
+        batch_descriptions = ["" for _ in batch]
+        batch_years = [
+            str(datetime.strptime(ts, "%Y-%m-%d").year)
+            for _, _, _, ts in facts[i : i + batch_size]
+        ]
+        has_years = False
+        while not has_years:
+            # only perform generation for description that don't have
+            # fact year yet
+            batch_indices = [
+                i
+                for i in range(len(batch))
+                if not batch_years[i] in batch_descriptions[i]
+            ]
             output = pipe(
-                message,
+                [messages[i] for i in batch_indices],
                 max_new_tokens=256,
                 pad_token_id=pipe.tokenizer.eos_token_id,  # type: ignore
+                batch_size=len(batch_indices),
             )
-            desc = output[0]["generated_text"][-1]["content"]  # type: ignore
-        descriptions.append(desc)
+            for i, output in enumerate(outputs):  # type: ignore
+                batch_descriptions[batch_indices[i]] = output[0]["generated_text"][-1][
+                    "content"
+                ]  # type: ignore
+            has_years = all(
+                year in desc for year, desc in zip(batch_years, batch_descriptions)
+            )
+        descriptions += batch_descriptions
 
     return descriptions
 
@@ -238,7 +257,9 @@ def _get_fact_prompt(fact: Fact) -> str:
     return prompt
 
 
-def gen_facts_description(facts: List[Fact], pipe: Pipeline) -> List[str]:
+def gen_facts_description(
+    facts: List[Fact], pipe: Pipeline, batch_size: int = 8
+) -> List[str]:
     """Given list of quadruples FACTS, generate a description using
     PIPE.
 
@@ -257,17 +278,36 @@ def gen_facts_description(facts: List[Fact], pipe: Pipeline) -> List[str]:
     ]
 
     descriptions = []
-    for message, fact in tqdm(zip(messages, facts), total=len(messages)):
-        year = str(datetime.strptime(fact[3], "%Y-%m-%d").year)
-        desc = ""
-        while not year in desc:
+    for i in tqdm(range(0, len(messages), batch_size)):
+        batch = messages[i : i + batch_size]
+        batch_descriptions = ["" for _ in batch]
+        batch_years = [
+            str(datetime.strptime(ts, "%Y-%m-%d").year)
+            for _, _, _, ts in facts[i : i + batch_size]
+        ]
+        has_years = False
+        while not has_years:
+            # only perform generation for description that don't have
+            # fact year yet
+            batch_indices = [
+                i
+                for i in range(len(batch))
+                if not batch_years[i] in batch_descriptions[i]
+            ]
             output = pipe(
-                message,
+                [messages[i] for i in batch_indices],
                 max_new_tokens=256,
                 pad_token_id=pipe.tokenizer.eos_token_id,  # type: ignore
+                batch_size=len(batch_indices),
             )
-            desc = output[0]["generated_text"][-1]["content"]  # type: ignore
-        descriptions.append(desc)
+            for i, output in enumerate(outputs):  # type: ignore
+                batch_descriptions[batch_indices[i]] = output[0]["generated_text"][-1][
+                    "content"
+                ]  # type: ignore
+            has_years = all(
+                year in desc for year, desc in zip(batch_years, batch_descriptions)
+            )
+        descriptions += batch_descriptions
 
     return descriptions
 
