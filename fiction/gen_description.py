@@ -298,7 +298,7 @@ def gen_facts_description(
                 for i in range(len(batch))
                 if not batch_years[i] in batch_descriptions[i]
             ]
-            output = pipe(
+            outputs = pipe(
                 [messages[i] for i in batch_indices],
                 max_new_tokens=256,
                 pad_token_id=pipe.tokenizer.eos_token_id,  # type: ignore
