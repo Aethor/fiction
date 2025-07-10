@@ -176,9 +176,14 @@ def gen_multifacts_description(
     for i in tqdm(range(0, len(messages), batch_size)):
         batch = messages[i : i + batch_size]
         batch_descriptions = ["" for _ in batch]
+        for facts in fact_groups[i : i + batch_size]:
+            assert (
+                len({datetime.strptime(fact[3], "%Y-%m-%d").year for fact in facts})
+                == 1
+            )
         batch_years = [
-            str(datetime.strptime(ts, "%Y-%m-%d").year)
-            for _, _, _, ts in facts[i : i + batch_size]
+            str(datetime.strptime(facts[0][3], "%Y-%m-%d").year)
+            for facts in fact_groups[i : i + batch_size]
         ]
         has_years = False
         while not has_years:
@@ -189,16 +194,15 @@ def gen_multifacts_description(
                 for i in range(len(batch))
                 if not batch_years[i] in batch_descriptions[i]
             ]
-            output = pipe(
+            outputs = pipe(
                 [messages[i] for i in batch_indices],
                 max_new_tokens=256,
                 pad_token_id=pipe.tokenizer.eos_token_id,  # type: ignore
                 batch_size=len(batch_indices),
             )
             for i, output in enumerate(outputs):  # type: ignore
-                batch_descriptions[batch_indices[i]] = output[0]["generated_text"][-1][
-                    "content"
-                ]  # type: ignore
+                desc = output[0]["generated_text"][-1]["content"]  # type: ignore
+                batch_descriptions[batch_indices[i]] = desc  # type: ignore
             has_years = all(
                 year in desc for year, desc in zip(batch_years, batch_descriptions)
             )
@@ -301,9 +305,8 @@ def gen_facts_description(
                 batch_size=len(batch_indices),
             )
             for i, output in enumerate(outputs):  # type: ignore
-                batch_descriptions[batch_indices[i]] = output[0]["generated_text"][-1][
-                    "content"
-                ]  # type: ignore
+                desc = output[0]["generated_text"][-1]["content"]  # type: ignore
+                batch_descriptions[batch_indices[i]] = desc  # type: ignore
             has_years = all(
                 year in desc for year, desc in zip(batch_years, batch_descriptions)
             )
