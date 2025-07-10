@@ -173,15 +173,17 @@ def gen_multifacts_description(
     ]
 
     descriptions = []
-    for i in tqdm(range(0, len(messages), batch_size)):
-        batch = messages[i : i + batch_size]
-        outputs = pipe(
-            batch,
-            max_new_tokens=256,
-            pad_token_id=pipe.tokenizer.eos_token_id,
-            batch_size=batch_size,
-        )
-        descriptions += [out[0]["generated_text"][-1]["content"] for out in outputs]
+    for message, fact in tqdm(zip(messages, facts), total=len(messages)):
+        year = str(datetime.strptime(fact[3], "%Y-%m-%d").year)
+        desc = ""
+        while not year in desc:
+            output = pipe(
+                message,
+                max_new_tokens=256,
+                pad_token_id=pipe.tokenizer.eos_token_id,  # type: ignore
+            )
+            desc = output[0]["generated_text"][-1]["content"]  # type: ignore
+        descriptions.append(desc)
 
     return descriptions
 
@@ -236,9 +238,7 @@ def _get_fact_prompt(fact: Fact) -> str:
     return prompt
 
 
-def gen_facts_description(
-    facts: List[Fact], pipe: Pipeline, batch_size: int = 4
-) -> List[str]:
+def gen_facts_description(facts: List[Fact], pipe: Pipeline) -> List[str]:
     """Given list of quadruples FACTS, generate a description using
     PIPE.
 
@@ -257,15 +257,17 @@ def gen_facts_description(
     ]
 
     descriptions = []
-    for i in tqdm(range(0, len(messages), batch_size)):
-        batch = messages[i : i + batch_size]
-        outputs = pipe(
-            batch,
-            max_new_tokens=256,
-            pad_token_id=pipe.tokenizer.eos_token_id,
-            batch_size=batch_size,
-        )
-        descriptions += [out[0]["generated_text"][-1]["content"] for out in outputs]
+    for message, fact in tqdm(zip(messages, facts), total=len(messages)):
+        year = str(datetime.strptime(fact[3], "%Y-%m-%d").year)
+        desc = ""
+        while not year in desc:
+            output = pipe(
+                message,
+                max_new_tokens=256,
+                pad_token_id=pipe.tokenizer.eos_token_id,  # type: ignore
+            )
+            desc = output[0]["generated_text"][-1]["content"]  # type: ignore
+        descriptions.append(desc)
 
     return descriptions
 
