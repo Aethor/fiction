@@ -174,16 +174,18 @@ def gen_multifacts_description(
 
     descriptions = []
     for i in tqdm(range(0, len(messages), batch_size)):
-        batch = messages[i : i + batch_size]
-        batch_descriptions = ["" for _ in batch]
-        for facts in fact_groups[i : i + batch_size]:
+        batch_start = i * batch_size
+        batch_end = i * batch_size + batch_size
+        batch_messages = messages[batch_start:batch_end]
+        batch_descriptions = ["" for _ in batch_messages]
+        for facts in fact_groups[batch_start:batch_end]:
             assert (
                 len({datetime.strptime(fact[3], "%Y-%m-%d").year for fact in facts})
                 == 1
             )
         batch_years = [
             str(datetime.strptime(facts[0][3], "%Y-%m-%d").year)
-            for facts in fact_groups[i : i + batch_size]
+            for facts in fact_groups[batch_start:batch_end]
         ]
         has_years = False
         while not has_years:
@@ -191,7 +193,7 @@ def gen_multifacts_description(
             # fact year yet
             batch_indices = [
                 i
-                for i in range(len(batch))
+                for i in range(len(batch_messages))
                 if not batch_years[i] in batch_descriptions[i]
             ]
             outputs = pipe(
@@ -283,11 +285,13 @@ def gen_facts_description(
 
     descriptions = []
     for i in tqdm(range(0, len(messages), batch_size)):
-        batch = messages[i : i + batch_size]
-        batch_descriptions = ["" for _ in batch]
+        batch_start = i * batch_size
+        batch_end = i * batch_size + batch_size
+        batch_messages = messages[batch_start:batch_end]
+        batch_descriptions = ["" for _ in batch_messages]
         batch_years = [
             str(datetime.strptime(ts, "%Y-%m-%d").year)
-            for _, _, _, ts in facts[i : i + batch_size]
+            for _, _, _, ts in facts[batch_start:batch_end]
         ]
         has_years = False
         while not has_years:
@@ -295,7 +299,7 @@ def gen_facts_description(
             # fact year yet
             batch_indices = [
                 i
-                for i in range(len(batch))
+                for i in range(len(batch_messages))
                 if not batch_years[i] in batch_descriptions[i]
             ]
             outputs = pipe(
