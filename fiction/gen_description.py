@@ -173,9 +173,8 @@ def gen_multifacts_description(
     ]
 
     descriptions = []
-    for i in tqdm(range(0, len(messages), batch_size)):
-        batch_start = i * batch_size
-        batch_end = i * batch_size + batch_size
+    for batch_start in tqdm(range(0, len(messages), batch_size)):
+        batch_end = batch_start + batch_size
         batch_messages = messages[batch_start:batch_end]
         batch_descriptions = ["" for _ in batch_messages]
         for facts in fact_groups[batch_start:batch_end]:
@@ -197,7 +196,7 @@ def gen_multifacts_description(
                 if not batch_years[i] in batch_descriptions[i]
             ]
             outputs = pipe(
-                [messages[i] for i in batch_indices],
+                [batch_messages[i] for i in batch_indices],
                 max_new_tokens=256,
                 pad_token_id=pipe.tokenizer.eos_token_id,  # type: ignore
                 batch_size=len(batch_indices),
@@ -284,9 +283,8 @@ def gen_facts_description(
     ]
 
     descriptions = []
-    for i in tqdm(range(0, len(messages), batch_size)):
-        batch_start = i * batch_size
-        batch_end = i * batch_size + batch_size
+    for batch_start in tqdm(range(0, len(messages), batch_size)):
+        batch_end = batch_start + batch_size
         batch_messages = messages[batch_start:batch_end]
         batch_descriptions = ["" for _ in batch_messages]
         batch_years = [
@@ -303,7 +301,7 @@ def gen_facts_description(
                 if not batch_years[i] in batch_descriptions[i]
             ]
             outputs = pipe(
-                [messages[i] for i in batch_indices],
+                [batch_messages[i] for i in batch_indices],
                 max_new_tokens=256,
                 pad_token_id=pipe.tokenizer.eos_token_id,  # type: ignore
                 batch_size=len(batch_indices),
