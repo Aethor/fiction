@@ -260,8 +260,8 @@ if __name__ == "__main__":
     # that ends after the start date of the earliest event from the
     # valid set (likewise for valid/train)
     facts = sorted(facts, key=lambda fact: Date(fact[3]))  # type: ignore
-    train = facts[: int(0.8 * len(facts))]
-    valid = facts[int(0.8 * len(facts)) : int(0.9 * len(facts))]
+    train = facts[: int(0.9 * len(facts))]
+    valid = []  # we have no use for the validation dataset
     test = facts[int(0.9 * len(facts)) :]
 
     dump_facts(
