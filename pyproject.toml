@@ -17,6 +17,7 @@ dependencies = [
     "torch>=2.7.0",
     "tqdm>=4.67.1",
     "transformers>=4.51.3",
+    "requests>=2.32.3",
 ]
 
 [dependency-groups]

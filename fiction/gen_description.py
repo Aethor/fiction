@@ -1,8 +1,11 @@
-from typing import Tuple, List, Optional
-import argparse, re, random
+from __future__ import annotations
+import argparse, re, random, json
 import pathlib as pl
 from datetime import datetime, timedelta
+from dataclasses import dataclass
+from typing import Optional
 import torch
+import requests
 from transformers import pipeline  # type: ignore
 from transformers.pipelines.base import Pipeline
 from tqdm import tqdm
@@ -15,7 +18,33 @@ from fiction.utils import dump_json, load_facts
 from fiction.yago_rel_desc import YAGO_REL_DESC
 
 # (subj, rel, obj, ts)
-Fact = Tuple[str, str, str, str]
+Fact = tuple[str, str, str, str]
+
+
+@dataclass
+class GCloudConfig:
+    model_id: str
+    project: str
+    location: str
+    api_endpoint: str
+    access_token: str
+
+    @staticmethod
+    def from_json(json_str: str) -> GCloudConfig:
+        return GCloudConfig(**json.loads(json_str))
+
+
+def hf_get_pipeline(huggingface_id: str) -> Pipeline:
+    pipe = pipeline(
+        "text-generation",
+        model=huggingface_id,
+        model_kwargs={"torch_dtype": torch.bfloat16},
+        device_map="auto",
+    )
+    assert not pipe.tokenizer is None
+    pipe.tokenizer.pad_token_id = pipe.tokenizer.eos_token_id
+    pipe.tokenizer.padding_side = "left"
+    return pipe
 
 
 def string_lstrip(s: str, to_strip: str) -> str:
@@ -90,13 +119,13 @@ def format_fact(fact: Fact) -> Fact:
 
 
 def group_related_facts(
-    facts: List[Fact],
+    facts: list[Fact],
     min_size: int,
     max_size: int,
     db_info: YagoDBInfo,
     alpha: float = 0.9,
     k: float = 0.03,
-) -> List[List[Fact]]:
+) -> list[list[Fact]]:
     """Group related facts, returning a list of groups of such facts"""
     dists = np.zeros((len(facts), len(facts)))
     for i in tqdm(range(len(facts)), desc="dist"):
@@ -127,7 +156,7 @@ def _get_multifact_prompt(fact_group: list[Fact]) -> str:
     and the following definitions for the relations:
     {}
     Generate a short paragraph describing these events, in the style of a newspaper.
-    You can add additional details, but the entirety of the information in the given quadruplets must be preserved. 
+    You can add additional details, but the entirety of the information in the given quadruplets must be preserved.
     Do NOT add any additional information or text: you must only generate the description.
     """
     formatted_facts = [format_fact(fact) for fact in fact_group]
@@ -155,9 +184,9 @@ def _get_multifact_prompt(fact_group: list[Fact]) -> str:
     )
 
 
-def gen_multifacts_description(
-    fact_groups: List[List[Fact]], pipe: Pipeline, batch_size: int = 8
-) -> List[str]:
+def hf_gen_multifacts_description(
+    fact_groups: list[list[Fact]], pipe: Pipeline, batch_size: int = 8
+) -> list[str]:
     messages = [
         [
             {
@@ -212,8 +241,58 @@ def gen_multifacts_description(
     return descriptions
 
 
-def gen_multifact_description(fact_group: List[Fact], pipe: Pipeline) -> str:
-    return gen_multifacts_description([fact_group], pipe)[0]
+def hf_gen_multifact_description(fact_group: list[Fact], pipe: Pipeline) -> str:
+    return hf_gen_multifacts_description([fact_group], pipe)[0]
+
+
+def vertexai_gen_multifacts_description(
+    fact_groups: list[list[Fact]], config: GCloudConfig
+) -> list[Optional[str]]:
+    url = f"https://{config.api_endpoint}/v1/projects/{config.project}/locations/{config.location}/endpoints/openapi/chat/completions"
+    headers = {
+        "Authorization": f"Bearer {config.access_token}",
+        "Content-Type": "application/json",
+    }
+
+    descriptions = []
+    usage_stats = []
+
+    for fact_group in fact_groups:
+        data = {
+            "model": config.model_id,
+            "stream": False,
+            "messages": [
+                {"role": "user", "content": _get_multifact_prompt(fact_group)}
+            ],
+        }
+
+        response = requests.post(url, headers=headers, json=data)
+        if response.status_code != 200:
+            print(
+                f"warning: could not generate a description for {fact_group}. (reason: {response.status_code} {response.json()})"
+            )
+            descriptions.append(None)
+            continue
+        response_json = response.json()
+        desc = response_json["choices"][0]["message"]["content"]
+        descriptions.append(desc)
+        usage_stats.append(response_json["usage"])
+
+    print("usage summary:")
+    print(
+        "completions_tokens: {}".format(
+            sum(s["completion_tokens"] for s in usage_stats)
+        )
+    )
+    print("prompt_tokens: {}".format(sum(s["prompt_tokens"] for s in usage_stats)))
+
+    return descriptions
+
+
+def vertexai_gen_multifact_description(
+    fact_group: list[Fact], config: GCloudConfig
+) -> Optional[str]:
+    return vertexai_gen_multifacts_description([fact_group], config)[0]
 
 
 def ts_day_ordinal(day: int) -> str:
@@ -262,9 +341,9 @@ def _get_fact_prompt(fact: Fact) -> str:
     return prompt
 
 
-def gen_facts_description(
-    facts: List[Fact], pipe: Pipeline, batch_size: int = 8
-) -> List[str]:
+def hf_gen_facts_description(
+    facts: list[Fact], pipe: Pipeline, batch_size: int = 8
+) -> list[str]:
     """Given list of quadruples FACTS, generate a description using
     PIPE.
 
@@ -317,13 +396,60 @@ def gen_facts_description(
     return descriptions
 
 
-def gen_fact_description(fact: Fact, pipe: Pipeline) -> str:
+def hf_gen_fact_description(fact: Fact, pipe: Pipeline) -> str:
     """Given the quadruples FACT, generate a description using LM.
 
     :param fact: quadruple for which to generate a description
     :param pipe: huggingface text-generation pipeline
     """
-    return gen_facts_description([fact], pipe)[0]
+    return hf_gen_facts_description([fact], pipe)[0]
+
+
+def vertexai_gen_facts_description(
+    facts: list[Fact], config: GCloudConfig
+) -> list[Optional[str]]:
+    descriptions = []
+    usage_stats = []
+
+    for fact in facts:
+        url = f"https://{config.api_endpoint}/v1/projects/{config.project}/locations/{config.location}/endpoints/openapi/chat/completions"
+
+        data = {
+            "model": config.model_id,
+            "stream": False,
+            "messages": [{"role": "user", "content": _get_fact_prompt(fact)}],
+        }
+
+        headers = {
+            "Authorization": f"Bearer {config.access_token}",
+            "Content-Type": "application/json",
+        }
+
+        response = requests.post(url, headers=headers, json=data)
+        if response.status_code != 200:
+            print(
+                f"warning: could not generate a description for {fact}. (reason: {response.status_code} {response.json()})"
+            )
+            descriptions.append(None)
+            continue
+        response_json = response.json()
+        desc = response_json["choices"][0]["message"]["content"]
+        descriptions.append(desc)
+        usage_stats.append(response_json["usage"])
+
+    print("usage summary:")
+    print(
+        "completions_tokens: {}".format(
+            sum(s["completion_tokens"] for s in usage_stats)
+        )
+    )
+    print("prompt_tokens: {}".format(sum(s["prompt_tokens"] for s in usage_stats)))
+
+    return descriptions
+
+
+def vertexai_gen_fact_description(fact: Fact, config: GCloudConfig) -> Optional[str]:
+    return vertexai_gen_facts_description([fact], config)[0]
 
 
 if __name__ == "__main__":
@@ -376,21 +502,21 @@ if __name__ == "__main__":
         "-l",
         "--language-model",
         type=str,
-        default="meta-llama/Meta-Llama-3.1-8B-Instruct",
+        default="hf:meta-llama/Meta-Llama-3.1-8B-Instruct",
+        help="HuggingFace ID of the language model used to generate descriptions, prefixed by 'hf:' (example: 'hf:meta-llama/Meta-Llama-3.1-8B-Instruct'). Alternatively, the ID of a Google Vertex AI model, prefixed by 'vertexai:' (example: 'vertexai:meta/llama-3.3-70b-instruct-maas').",
+    )
+    parser.add_argument(
+        "-g",
+        "--gcloud-config",
+        type=str,
+        default="{}",
+        help='google cloud config, as a json dictionary. The following keys must be present: "model_id", "project", "location", "api_endpoint", "access_token". Example: {"model_id": "meta/llama-3.3-70b-instruct-maas", "project": "your_project_id", "location": "us-central1", "api_endpoint": "us-central1-aiplatform.googleapis.com", "access_token": "your_access_token"}',
     )
     args = parser.parse_args()
 
     facts = load_facts(args.facts_file, "loading facts")
 
-    pipe = pipeline(
-        "text-generation",
-        model=args.language_model,
-        model_kwargs={"torch_dtype": torch.bfloat16},
-        device_map="auto",
-    )
-    assert not pipe.tokenizer is None
-    pipe.tokenizer.pad_token_id = pipe.tokenizer.eos_token_id
-    pipe.tokenizer.padding_side = "left"
+    lm_provider, lm = args.language_model.split(":")
 
     dataset = []
     if args.multi_min_size:  # all --multi arguments should be specified
@@ -403,8 +529,17 @@ if __name__ == "__main__":
             alpha=args.multi_alpha,
             k=args.multi_k,
         )
-        descs = gen_multifacts_description(fact_groups, pipe)
+        if lm_provider == "hf":
+            pipe = hf_get_pipeline(lm)
+            descs = hf_gen_multifacts_description(fact_groups, pipe)
+        elif lm_provider == "vertexai":
+            gconfig = GCloudConfig.from_json(args.gcloud_config)
+            descs = vertexai_gen_multifacts_description(fact_groups, gconfig)
+        else:
+            raise ValueError(f"Unknown LLM provider: {lm_provider}.")
         for fact_group, desc in zip(fact_groups, descs):
+            if desc is None:
+                desc = ["None", "None", "None", "None"]
             dataset.append(
                 {
                     "facts": [
@@ -420,8 +555,17 @@ if __name__ == "__main__":
                 }
             )
     else:
-        descs = gen_facts_description(facts, pipe)
+        if lm_provider == "hf":
+            pipe = hf_get_pipeline(lm)
+            descs = hf_gen_facts_description(facts, pipe)
+        elif lm_provider == "vertexai":
+            gconfig = GCloudConfig.from_json(args.gcloud_config)
+            descs = vertexai_gen_facts_description(facts, gconfig)
+        else:
+            raise ValueError(f"Unknown LLM provider: {lm_provider}.")
         for fact, desc in zip(facts, descs):
+            if desc is None:
+                desc = ["None", "None", "None", "None"]
             dataset.append(
                 {
                     "subject": fact[0],
