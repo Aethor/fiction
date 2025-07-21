@@ -371,7 +371,7 @@ if __name__ == "__main__":
     )
     args = parser.parse_args()
 
-    rules = load_rules(args.rules, args.rule_lengths, min_conf=0, min_body_supp=1)
+    rules = load_rules(args.rules, args.rule_lengths, min_conf=0.01, min_body_supp=2)
     fact_dataset = load_fact_dataset(args.dataset_dir)
     db_info = YagoDBInfo.from_yago_dir(args.yago_dir)
 
