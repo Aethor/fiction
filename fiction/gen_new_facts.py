@@ -250,7 +250,7 @@ def sample_new_facts(
     new_facts = []
     tries_nb = 0
     progress = tqdm(total=facts_per_day, ascii=True)
-    while len(new_facts) < facts_per_day or tries_nb > max_tries_nb:
+    while len(new_facts) < facts_per_day and tries_nb < max_tries_nb:
         to_gen_nb = facts_per_day - len(new_facts)
 
         relations = random.choices(
@@ -416,7 +416,7 @@ if __name__ == "__main__":
                 rules,
                 fact_dataset,
                 db_info,
-                10,
+                8,
                 parallel,
             )
 
