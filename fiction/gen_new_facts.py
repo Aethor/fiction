@@ -247,20 +247,11 @@ def sample_new_facts(
 
     print(f"generating {facts_per_day} facts for {ts}...")
 
-    # we will try to generate all facts in parallel. It's better to do
-    # it in a single pass: otherwise, we have to copy fact_dataset in
-    # each worker a second time. Therefore, we add a few more queries
-    # to perform. This is OK since we will exit early if all facts are
-    # generated anyway.
-    margin = 0
-    if parallel.n_jobs > 1:
-        margin = int(1 / 3 * facts_per_day)
-
     new_facts = []
     tries_nb = 0
     progress = tqdm(total=facts_per_day, ascii=True)
     while len(new_facts) < facts_per_day or tries_nb > max_tries_nb:
-        to_gen_nb = facts_per_day - len(new_facts) + margin
+        to_gen_nb = facts_per_day - len(new_facts)
 
         relations = random.choices(
             list(fact_dataset.rel2id.keys()),
