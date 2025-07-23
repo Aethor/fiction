@@ -1,5 +1,5 @@
 from __future__ import annotations
-import argparse, re, random, json
+import argparse, re, random, json, subprocess
 import pathlib as pl
 from datetime import datetime, timedelta
 from dataclasses import dataclass
@@ -26,7 +26,6 @@ class GCloudConfig:
     project: str
     location: str
     api_endpoint: str
-    access_token: str
 
     @staticmethod
     def from_json(json_str: str) -> GCloudConfig:
@@ -248,15 +247,21 @@ def vertexai_gen_multifacts_description(
     fact_groups: list[list[Fact]], model_id: str, config: GCloudConfig
 ) -> list[Optional[str]]:
     url = f"https://{config.api_endpoint}/v1/projects/{config.project}/locations/{config.location}/endpoints/openapi/chat/completions"
-    headers = {
-        "Authorization": f"Bearer {config.access_token}",
-        "Content-Type": "application/json",
-    }
 
     descriptions = []
     usage_stats = []
 
     for fact_group in tqdm(fact_groups):
+        access_token = (
+            subprocess.check_output(["gcloud", "auth", "print-access-token"])
+            .decode("utf8")
+            .strip("\n")
+        )
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        }
+
         data = {
             "model": model_id,
             "stream": False,
@@ -407,21 +412,26 @@ def hf_gen_fact_description(fact: Fact, pipe: Pipeline) -> str:
 def vertexai_gen_facts_description(
     facts: list[Fact], model_id: str, config: GCloudConfig
 ) -> list[Optional[str]]:
+    url = f"https://{config.api_endpoint}/v1/projects/{config.project}/locations/{config.location}/endpoints/openapi/chat/completions"
+
     descriptions = []
     usage_stats = []
 
     for fact in tqdm(facts):
-        url = f"https://{config.api_endpoint}/v1/projects/{config.project}/locations/{config.location}/endpoints/openapi/chat/completions"
+        access_token = (
+            subprocess.check_output(["gcloud", "auth", "print-access-token"])
+            .decode("utf8")
+            .strip("\n")
+        )
+        headers = {
+            "Authorization": f"Bearer {access_token}",
+            "Content-Type": "application/json",
+        }
 
         data = {
             "model": model_id,
             "stream": False,
             "messages": [{"role": "user", "content": _get_fact_prompt(fact)}],
-        }
-
-        headers = {
-            "Authorization": f"Bearer {config.access_token}",
-            "Content-Type": "application/json",
         }
 
         response = requests.post(url, headers=headers, json=data)
@@ -504,14 +514,14 @@ if __name__ == "__main__":
         "--language-model",
         type=str,
         default="hf:meta-llama/Meta-Llama-3.1-8B-Instruct",
-        help="HuggingFace ID of the language model used to generate descriptions, prefixed by 'hf:' (example: 'hf:meta-llama/Meta-Llama-3.1-8B-Instruct'). Alternatively, the ID of a Google Vertex AI model, prefixed by 'vertexai:' (example: 'vertexai:meta/llama-3.3-70b-instruct-maas').",
+        help="HuggingFace ID of the language model used to generate descriptions, prefixed by 'hf:' (example: 'hf:meta-llama/Meta-Llama-3.1-8B-Instruct'). Alternatively, the ID of a Google Vertex AI model, prefixed by 'vertexai:' (example: 'vertexai:meta/llama-3.3-70b-instruct-maas'). In that case, you must also set --gcloud-config.",
     )
     parser.add_argument(
         "-g",
         "--gcloud-config",
         type=str,
         default="{}",
-        help='google cloud config, as a json dictionary. The following keys must be present: "model_id", "project", "location", "api_endpoint", "access_token". Example: {"project": "your_project_id", "location": "us-central1", "api_endpoint": "us-central1-aiplatform.googleapis.com", "access_token": "your_access_token"}',
+        help='google cloud config, as a json dictionary. The following keys must be present: "model_id", "project", "location", "api_endpoint", "access_token". Example: {"project": "your_project_id", "location": "us-central1", "api_endpoint": "us-central1-aiplatform.googleapis.com"}. Note that the access token will be dynamically obtained with $(gcloud auth print-access-token), so make sure you configured your gcloud CLI accordingly.',
     )
     args = parser.parse_args()
 
