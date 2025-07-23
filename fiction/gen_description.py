@@ -521,7 +521,7 @@ if __name__ == "__main__":
         "--gcloud-config",
         type=str,
         default="{}",
-        help='google cloud config, as a json dictionary. The following keys must be present: "model_id", "project", "location", "api_endpoint", "access_token". Example: {"project": "your_project_id", "location": "us-central1", "api_endpoint": "us-central1-aiplatform.googleapis.com"}. Note that the access token will be dynamically obtained with $(gcloud auth print-access-token), so make sure you configured your gcloud CLI accordingly.',
+        help='google cloud config, as a json dictionary. The following keys must be present: "model_id", "project", "location", "api_endpoint". Example: {"project": "your_project_id", "location": "us-central1", "api_endpoint": "us-central1-aiplatform.googleapis.com"}. Note that the access token will be dynamically obtained with $(gcloud auth print-access-token), so make sure you configured your gcloud CLI accordingly.',
     )
     args = parser.parse_args()
 
