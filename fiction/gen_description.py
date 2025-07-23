@@ -23,7 +23,6 @@ Fact = tuple[str, str, str, str]
 
 @dataclass
 class GCloudConfig:
-    model_id: str
     project: str
     location: str
     api_endpoint: str
@@ -246,7 +245,7 @@ def hf_gen_multifact_description(fact_group: list[Fact], pipe: Pipeline) -> str:
 
 
 def vertexai_gen_multifacts_description(
-    fact_groups: list[list[Fact]], config: GCloudConfig
+    fact_groups: list[list[Fact]], model_id: str, config: GCloudConfig
 ) -> list[Optional[str]]:
     url = f"https://{config.api_endpoint}/v1/projects/{config.project}/locations/{config.location}/endpoints/openapi/chat/completions"
     headers = {
@@ -257,9 +256,9 @@ def vertexai_gen_multifacts_description(
     descriptions = []
     usage_stats = []
 
-    for fact_group in fact_groups:
+    for fact_group in tqdm(fact_groups):
         data = {
-            "model": config.model_id,
+            "model": model_id,
             "stream": False,
             "messages": [
                 {"role": "user", "content": _get_multifact_prompt(fact_group)}
@@ -268,7 +267,7 @@ def vertexai_gen_multifacts_description(
 
         response = requests.post(url, headers=headers, json=data)
         if response.status_code != 200:
-            print(
+            tqdm.write(
                 f"warning: could not generate a description for {fact_group}. (reason: {response.status_code} {response.json()})"
             )
             descriptions.append(None)
@@ -290,9 +289,9 @@ def vertexai_gen_multifacts_description(
 
 
 def vertexai_gen_multifact_description(
-    fact_group: list[Fact], config: GCloudConfig
+    fact_group: list[Fact], model_id: str, config: GCloudConfig
 ) -> Optional[str]:
-    return vertexai_gen_multifacts_description([fact_group], config)[0]
+    return vertexai_gen_multifacts_description([fact_group], model_id, config)[0]
 
 
 def ts_day_ordinal(day: int) -> str:
@@ -406,16 +405,16 @@ def hf_gen_fact_description(fact: Fact, pipe: Pipeline) -> str:
 
 
 def vertexai_gen_facts_description(
-    facts: list[Fact], config: GCloudConfig
+    facts: list[Fact], model_id: str, config: GCloudConfig
 ) -> list[Optional[str]]:
     descriptions = []
     usage_stats = []
 
-    for fact in facts:
+    for fact in tqdm(facts):
         url = f"https://{config.api_endpoint}/v1/projects/{config.project}/locations/{config.location}/endpoints/openapi/chat/completions"
 
         data = {
-            "model": config.model_id,
+            "model": model_id,
             "stream": False,
             "messages": [{"role": "user", "content": _get_fact_prompt(fact)}],
         }
@@ -427,7 +426,7 @@ def vertexai_gen_facts_description(
 
         response = requests.post(url, headers=headers, json=data)
         if response.status_code != 200:
-            print(
+            tqdm.write(
                 f"warning: could not generate a description for {fact}. (reason: {response.status_code} {response.json()})"
             )
             descriptions.append(None)
@@ -448,8 +447,10 @@ def vertexai_gen_facts_description(
     return descriptions
 
 
-def vertexai_gen_fact_description(fact: Fact, config: GCloudConfig) -> Optional[str]:
-    return vertexai_gen_facts_description([fact], config)[0]
+def vertexai_gen_fact_description(
+    fact: Fact, model_id: str, config: GCloudConfig
+) -> Optional[str]:
+    return vertexai_gen_facts_description([fact], model_id, config)[0]
 
 
 if __name__ == "__main__":
@@ -510,7 +511,7 @@ if __name__ == "__main__":
         "--gcloud-config",
         type=str,
         default="{}",
-        help='google cloud config, as a json dictionary. The following keys must be present: "model_id", "project", "location", "api_endpoint", "access_token". Example: {"model_id": "meta/llama-3.3-70b-instruct-maas", "project": "your_project_id", "location": "us-central1", "api_endpoint": "us-central1-aiplatform.googleapis.com", "access_token": "your_access_token"}',
+        help='google cloud config, as a json dictionary. The following keys must be present: "model_id", "project", "location", "api_endpoint", "access_token". Example: {"project": "your_project_id", "location": "us-central1", "api_endpoint": "us-central1-aiplatform.googleapis.com", "access_token": "your_access_token"}',
     )
     args = parser.parse_args()
 
@@ -534,7 +535,7 @@ if __name__ == "__main__":
             descs = hf_gen_multifacts_description(fact_groups, pipe)
         elif lm_provider == "vertexai":
             gconfig = GCloudConfig.from_json(args.gcloud_config)
-            descs = vertexai_gen_multifacts_description(fact_groups, gconfig)
+            descs = vertexai_gen_multifacts_description(fact_groups, lm, gconfig)
         else:
             raise ValueError(f"Unknown LLM provider: {lm_provider}.")
         for fact_group, desc in zip(fact_groups, descs):
@@ -560,7 +561,7 @@ if __name__ == "__main__":
             descs = hf_gen_facts_description(facts, pipe)
         elif lm_provider == "vertexai":
             gconfig = GCloudConfig.from_json(args.gcloud_config)
-            descs = vertexai_gen_facts_description(facts, gconfig)
+            descs = vertexai_gen_facts_description(facts, lm, gconfig)
         else:
             raise ValueError(f"Unknown LLM provider: {lm_provider}.")
         for fact, desc in zip(facts, descs):
