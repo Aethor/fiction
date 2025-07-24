@@ -270,7 +270,14 @@ def vertexai_gen_multifacts_description(
             ],
         }
 
-        response = requests.post(url, headers=headers, json=data)
+        try:
+            response = requests.post(url, headers=headers, json=data)
+        except Exception as e:
+            tqdm.write(
+                f"warning: could not generate a description for {fact_group}. (reason: {e})"
+            )
+            descriptions.append(None)
+            continue
         if response.status_code != 200:
             tqdm.write(
                 f"warning: could not generate a description for {fact_group}. (reason: {response.status_code} {response.json()})"
@@ -434,7 +441,14 @@ def vertexai_gen_facts_description(
             "messages": [{"role": "user", "content": _get_fact_prompt(fact)}],
         }
 
-        response = requests.post(url, headers=headers, json=data)
+        try:
+            response = requests.post(url, headers=headers, json=data)
+        except Exception as e:
+            tqdm.write(
+                f"warning: could not generate a description for {fact}. (reason: {e})"
+            )
+            descriptions.append(None)
+            continue
         if response.status_code != 200:
             tqdm.write(
                 f"warning: could not generate a description for {fact}. (reason: {response.status_code} {response.json()})"
