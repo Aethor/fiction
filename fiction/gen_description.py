@@ -271,7 +271,7 @@ def vertexai_gen_multifacts_description(
         }
 
         try:
-            response = requests.post(url, headers=headers, json=data)
+            response = requests.post(url, headers=headers, json=data, timeout=30)
         except Exception as e:
             tqdm.write(
                 f"warning: could not generate a description for {fact_group}. (reason: {e})"
@@ -442,7 +442,7 @@ def vertexai_gen_facts_description(
         }
 
         try:
-            response = requests.post(url, headers=headers, json=data)
+            response = requests.post(url, headers=headers, json=data, timeout=30)
         except Exception as e:
             tqdm.write(
                 f"warning: could not generate a description for {fact}. (reason: {e})"
