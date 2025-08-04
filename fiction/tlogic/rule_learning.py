@@ -228,12 +228,11 @@ class Rule_Learner(object):
                 self.rules_dict[rel], key=lambda x: x["conf"], reverse=True
             )
 
-    def save_rules(self, dt, rule_lengths, num_walks, transition_distr, seed):
+    def save_rules(self, rule_lengths, num_walks, transition_distr, seed):
         """
         Save all rules.
 
         Parameters:
-            dt (str): time now
             rule_lengths (list): rule lengths
             num_walks (int): number of walks
             transition_distr (str): transition distribution
@@ -244,21 +243,18 @@ class Rule_Learner(object):
         """
 
         rules_dict = {int(k): v for k, v in self.rules_dict.items()}
-        filename = "{0}_r{1}_n{2}_{3}_s{4}_rules.json".format(
-            dt, rule_lengths, num_walks, transition_distr, seed
+        filename = "r{1}_n{2}_{3}_s{4}_rules.json".format(
+            ",".join(rule_lengths), num_walks, transition_distr, seed
         )
         filename = filename.replace(" ", "")
         with open(self.output_dir + filename, "w", encoding="utf-8") as fout:
             json.dump(rules_dict, fout)
 
-    def save_rules_verbalized(
-        self, dt, rule_lengths, num_walks, transition_distr, seed
-    ):
+    def save_rules_verbalized(self, rule_lengths, num_walks, transition_distr, seed):
         """
         Save all rules in a human-readable format.
 
         Parameters:
-            dt (str): time now
             rule_lengths (list): rule lengths
             num_walks (int): number of walks
             transition_distr (str): transition distribution
@@ -273,8 +269,8 @@ class Rule_Learner(object):
             for rule in self.rules_dict[rel]:
                 rules_str += verbalize_rule(rule, self.id2relation) + "\n"
 
-        filename = "{0}_r{1}_n{2}_{3}_s{4}_rules.txt".format(
-            dt, rule_lengths, num_walks, transition_distr, seed
+        filename = "r{1}_n{2}_{3}_s{4}_rules.txt".format(
+            ",".join(rule_lengths), num_walks, transition_distr, seed
         )
         filename = filename.replace(" ", "")
         with open(self.output_dir + filename, "w", encoding="utf-8") as fout:
