@@ -32,6 +32,7 @@ def load_rules(
     min_conf: float = 0.0,
     min_body_supp: int = 1,
 ) -> dict[int, dict]:
+    """Load a TLogic rules file"""
     with open(path) as f:
         rules_dict = json.load(f)
     rules_dict = {int(k): v for k, v in rules_dict.items()}
@@ -89,6 +90,17 @@ def query_tlogic(
     fact_dataset: FactDataset,
     _train_idx: Optional[np.ndarray] = None,
 ) -> list[QueryOutput]:
+    """
+    Batch query TLogic for a list of queries of the form (subject,
+    relation, ?, timestamp)
+
+    :param queries: list of queries
+    :param rules: TLogic rules dictionary
+    :param fact_dataset: Past facts
+    :param _train_idx: optimization related parameter
+
+    :return: a list of QueryOutput. Each QueryOutput can be empty.
+    """
     if len(queries) == 0:
         return []
 
@@ -146,6 +158,7 @@ def maybe_max(lst: list[T], **kwargs) -> Optional[T]:
 
 
 def rel_is_active(rel: str, entity_facts: list[Fact]) -> bool:
+    """Check if relation REL is active (opened)."""
     latest_start = maybe_max([f[3] for f in entity_facts if f[1] == rel])
     if latest_start is None:
         return False
@@ -178,6 +191,7 @@ def unlinearize_rel(rel: str) -> str:
 
 
 def is_fact_valid(fact: Fact, db_info: YagoDBInfo) -> bool:
+    """Check whether a fact is valid regarding YAGO database schema."""
     subj, rel, obj, _ = fact
     rel = unlinearize_rel(rel)
     out = is_rel_allowed(subj, rel, db_info) and is_obj_allowed(obj, rel, db_info)
@@ -190,6 +204,13 @@ def prepare_queries(
     db_info: YagoDBInfo,
     max_queries: int = 4,
 ) -> list[Query]:
+    """
+    Given a relationship REL, randomly sample up to MAX_QUERIES
+    queries of the form (subject, relation, ?, timestamp).  Pre-filter
+    queries so that subject and relation are compatible according to
+    YAGO schema, and that relation is coherent regarding its state on
+    subject (e.g. you can't start a new job if you already have one).
+    """
     subjects = list(subj_facts.keys())
 
     subject_candidates = []
@@ -217,6 +238,10 @@ def prepare_queries(
 def filter_query_answers(
     answers: list[QueryOutput], queries: list[Query], db_info: YagoDBInfo
 ) -> Optional[Fact]:
+    """
+    Filter ANSWERS to return the best possible valid (according to
+    database schema) new fact.
+    """
     # transform each (obj, score) couple into (fact, score)
     obj_candidates = [
         [((query[0], query[1], obj, query[3]), score) for obj, score in candidates]
@@ -243,6 +268,25 @@ def sample_new_facts(
     max_tries_nb: int,
     parallel: Parallel,
 ) -> list[Fact]:
+    """Given a timestamp TS at the day level, attempt to generate
+    FACTS_PER_DAY future facts.
+
+    :param ts: day level timestamp of the form YYYY-MM-DD
+    :param facts_per_day: number of facts to generate.  If the system
+        cannot generate FACTS_PER_DAY facts, it might return less
+        facts than asked.
+    :param rel_probs: a dictionary of relationship to sampling
+        probability.
+    :param rules: TLogic rules dictionary, see :func:`load_rules`.
+    :param fact_dataset: past facts, see :func:`.load_fact_dataset`.
+    :param db_info: in-memory representation of the YAGO database,
+        used to filter new facts depending on whether thet respect
+        database schema.  See :meth:`.YagoDBInfo.from_yago_dir`.
+    :param max_tries_nb: max number of tries before giving up
+        generating FACTS_PER_DAY facts.
+
+    :return: generated facts.
+    """
     assert max_tries_nb >= 1
 
     print(f"generating {facts_per_day} facts for {ts}...")
