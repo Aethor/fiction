@@ -23,7 +23,7 @@ source .venv/bin/activate
 pip install -r requirements
 ```
 
-## Generating Future Events
+## Generating Future Facts
 
 ### The Easy Way
 
@@ -34,6 +34,8 @@ If you are in the right environment, simply running `make output/yago2026-facts.
 3. Extract a dataset from it in the format expected by TLogic (see `yago2dataset.py`)
 4. Train the TLogic module by extracting rules
 5. Generate new facts using these rules 
+
+You can also filter 2022 facts from yago using `make output/yago2022-facts.txt`
 
 ### Details 
 
@@ -85,7 +87,7 @@ python -m fiction.tlogic.learn\
        --num_processes 1
 ```
 
-Finally, we can generate new facts:
+Finally, we can generate new facts for 2026:
 
 ```sh
 python -m fiction.gen_new_facts\
@@ -99,6 +101,16 @@ python -m fiction.gen_new_facts\
        --output-file "./output/yago2026-facts.txt"
 ```
 
+To obtain 2022 facts, the script `fiction/filter_facts.py` can be used to filter existing facts from YAGO:
+
+```sh
+python -m fiction.filter_facts\
+       --dataset-dir ./data/yago4.5\
+       --output-file ./output/yago2022-facts.txt\
+       --min-year 2022\
+       --max-year 2022
+```
+
 
 ## Generating Descriptions
 
@@ -108,7 +120,7 @@ The `fiction/gen_description.py` script can generate either single-fact descript
 python -m fiction.gen_description\
        --facts-file "./output/yago2026-facts.txt"\
        --language-model "hf:meta-llama/Meta-Llama-3.1-8B-Instruct"\
-       --output-file "./output/yago2026_single.json"
+       --output-file "./output/yago2026.json"
 ```
 
 In the multi-facts setup, we have to pass additional arguments. `--multi-min-size` and `--multi-max-size` specify the minimum and maximum size of fact groups. `--multi-yago-dir` specifies the YAGO directory, which is needed to grouping facts by computing the distance between them. `--multi-alpha` and `--multi-k` are parameters in that distance computation, see the article for more details on these parameters. Example usage:
@@ -124,3 +136,10 @@ python -m fiction.gen_description\
        --multi-k 0.03\
        --output-file "./output/yago2026_multi.json"
 ```
+
+You can use also use the Makefile to generate facts using a default configuration (uses `"hf:meta-llama/Meta-Llama-3.1-8B-Instruct"` by default):
+
+- `make output/yago2026.json`
+- `make output/yago2026_multi.json`
+- `make output/yago2022.json`
+- `make output/yago2022_multi.json`
