@@ -32,7 +32,8 @@ If you are in the right environment, simply running `make output/yago2026-facts.
 1. Download the Yago4.5 database
 2. Strip it down to a smaller version (see `strip_yago.py`)
 3. Extract a dataset from it in the format expected by TLogic (see `yago2dataset.py`)
-4. Train a rule file
+4. Train the TLogic module by extracting rules
+5. Generate new facts using these rules 
 
 ### Details 
 
@@ -47,7 +48,7 @@ To obtain the YAGO knowledge base, you can download the original directly from t
 python strip_yago.py --input-dir yago4.5_full --output-dir yago4.5
 ```
 
-After downloading, it is necesseray to transform the knowledge base into a format understood by TLogic. This can be done with the `yago2dataset.py` script:
+After downloading, it is necessary to transform the knowledge base into a format understood by TLogic. This can be done with the `yago2dataset.py` script:
 
 ```sh
 python yago2dataset.py\
