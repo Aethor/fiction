@@ -125,7 +125,7 @@ def facts_dist(
     fact1: Fact, fact2: Fact, alpha: float, k: float, db_info: YagoDBInfo
 ) -> float:
     """
-    α (d_ent(s_1, s_2) + d_ent(o_1, o_2)) + (1 - α) (d_time(t_1, t_2))
+    α (d_ent(s_1, s_2) / 2 + d_ent(o_1, o_2) / 2) + (1 - α) (d_time(t_1, t_2))
     """
     subj1, _, obj1, ts1 = fact1
     subj2, _, obj2, ts2 = fact2

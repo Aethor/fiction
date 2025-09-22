@@ -47,3 +47,44 @@ output/yago2026-facts.txt: output/yago4.5/r1,2,3_n200_exp_s12_rules.json
 		--mimic-year 2022\
 		--process-nb 8\
 		--output-file "./output/yago2026-facts.txt"
+
+output/yago2022-facts.txt: data/yago4.5
+	python -m fiction.filter_facts\
+		--dataset-dir ./data/yago4.5\
+		--output-file ./output/yago2022-facts.txt\
+		--min-year 2022\
+		--max-year 2022
+
+output/yago2026.json: output/yago2026-facts.txt
+	python -m fiction.gen_description\
+		--facts-file "./output/yago2026-facts.txt"\
+		--language-model "hf:meta-llama/Meta-Llama-3.1-8B-Instruct"\
+		--output-file "./output/yago2026.json"
+
+output/yago2026_multi.json: output/yago2026-facts.txt yago4.5
+	python -m fiction.gen_description\
+		--facts-file "./output/yago2026-facts.txt"\
+		--language-model "hf:meta-llama/Meta-Llama-3.1-8B-Instruct"\
+		--multi-min-size 2\
+		--multi-max-size 4\
+		--multi-yago-dir "./yago4.5"\
+		--multi-alpha 0.9\
+		--multi-k 0.03\
+		--output-file "./output/yago2026_multi.json"
+
+output/yago2022.json: output/yago2022-facts.txt
+	python -m fiction.gen_description\
+		--facts-file "./output/yago2022-facts.txt"\
+		--language-model "hf:meta-llama/Meta-Llama-3.1-8B-Instruct"\
+		--output-file "./output/yago2022.json"
+
+output/yago2022_multi.json: output/yago2022-facts.txt yago4.5
+	python -m fiction.gen_description\
+		--facts-file "./output/yago2022-facts.txt"\
+		--language-model "hf:meta-llama/Meta-Llama-3.1-8B-Instruct"\
+		--multi-min-size 2\
+		--multi-max-size 4\
+		--multi-yago-dir "./yago4.5"\
+		--multi-alpha 0.9\
+		--multi-k 0.03\
+		--output-file "./output/yago2022_multi.json"
