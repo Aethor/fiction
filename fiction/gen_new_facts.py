@@ -360,6 +360,13 @@ if __name__ == "__main__":
         default=1,
         help="Number of process used for generation (note: currently this does not seem to increase performance).",
     )
+    parser.add_argument(
+        "-t",
+        "--joblib-temp-folder",
+        type=str,
+        default=None,
+        help="Temporary folder to be used by joblib's parallel.",
+    )
     args = parser.parse_args()
 
     rules = load_rules(args.rules, args.rule_lengths, min_conf=0.01, min_body_supp=2)
@@ -399,7 +406,11 @@ if __name__ == "__main__":
     max_counter = max(rel_counter.values())
     rel_probs = {rel: counter / max_counter for rel, counter in rel_counter.items()}
 
-    with Parallel(n_jobs=args.process_nb, return_as="generator_unordered") as parallel:
+    with Parallel(
+        n_jobs=args.process_nb,
+        return_as="generator_unordered",
+        temp_folder=args.joblib_temp_folder,
+    ) as parallel:
         while d.year < args.year + 1:
             ts = d.strftime("%Y-%m-%d")
 
