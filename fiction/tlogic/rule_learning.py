@@ -244,7 +244,7 @@ class Rule_Learner(object):
 
         rules_dict = {int(k): v for k, v in self.rules_dict.items()}
         filename = "r{1}_n{2}_{3}_s{4}_rules.json".format(
-            ",".join(rule_lengths), num_walks, transition_distr, seed
+            ",".join(map(str, rule_lengths)), num_walks, transition_distr, seed
         )
         filename = filename.replace(" ", "")
         with open(self.output_dir + filename, "w", encoding="utf-8") as fout:
