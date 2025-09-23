@@ -218,10 +218,11 @@ if __name__ == "__main__":
     parser.add_argument("--start-only-relations", "-a", default=set(), nargs="*")
     parser.add_argument("--end-only-relations", "-e", default=set(), nargs="*")
     parser.add_argument("--output-dir", "-o", type=pl.Path)
-    parser.add_argument("--min-year", "-miny", type=int, default=2024)
-    parser.add_argument("--max-year", "-maxy", type=int, default=1925)
+    parser.add_argument("--min-year", "-miny", type=int, default=1950)
+    parser.add_argument("--max-year", "-maxy", type=int, default=2024)
     parser.add_argument("--sparsity-filter-threshold", "-s", type=int, default=3)
     parser.add_argument("--linearize", "-l", action="store_true")
+    parser.add_argument("--train-proportion", "-p", type=float, default=0.98)
     args = parser.parse_args()
 
     relations = set(args.relations)
@@ -260,9 +261,9 @@ if __name__ == "__main__":
     # that ends after the start date of the earliest event from the
     # valid set (likewise for valid/train)
     facts = sorted(facts, key=lambda fact: Date(fact[3]))  # type: ignore
-    train = facts[: int(0.9 * len(facts))]
+    train = facts[: int(args.train_proportion * len(facts))]
     valid = []  # we have no use for the validation dataset
-    test = facts[int(0.9 * len(facts)) :]
+    test = facts[int(args.train_proportion * len(facts)) :]
 
     dump_facts(
         train, args.output_dir / "train.txt", f"writing train.txt to {args.output_dir}"
