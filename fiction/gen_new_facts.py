@@ -202,7 +202,7 @@ def prepare_queries(
     rel: str,
     subj_facts: dict[str, list[Fact]],
     db_info: YagoDBInfo,
-    max_queries: int = 4,
+    max_queries: int,
 ) -> list[Query]:
     """
     Given a relationship REL, randomly sample up to MAX_QUERIES
@@ -266,6 +266,7 @@ def sample_new_facts(
     fact_dataset: FactDataset,
     db_info: YagoDBInfo,
     max_tries_nb: int,
+    max_queries: int,
     parallel: Parallel,
 ) -> list[Fact]:
     """Given a timestamp TS at the day level, attempt to generate
@@ -282,6 +283,8 @@ def sample_new_facts(
     :param db_info: in-memory representation of the YAGO database,
         used to filter new facts depending on whether thet respect
         database schema.  See :meth:`.YagoDBInfo.from_yago_dir`.
+    :param max_queries: Maximum number of queries for a sampled
+        relation.  passed to :func:`prepare_queries`
     :param max_tries_nb: max number of tries before giving up
         generating FACTS_PER_DAY facts.
 
@@ -310,7 +313,7 @@ def sample_new_facts(
         subj_facts = fact_dataset.subj_facts()  # { subject => [fact, ...]}
         queries = []
         for rel in relations:
-            rel_queries = prepare_queries(rel, subj_facts, db_info)
+            rel_queries = prepare_queries(rel, subj_facts, db_info, max_queries)
             queries.append(rel_queries)
             for rel_query in rel_queries:
                 subj = rel_query[0]
@@ -411,6 +414,13 @@ if __name__ == "__main__":
         default=None,
         help="Temporary folder to be used by joblib's parallel.",
     )
+    parser.add_argument(
+        "-q",
+        "--max-queries",
+        type=int,
+        help="Maximum number of queries for a sampled relation. A higher number increases the chance to correctly mimic the relation distribution of the --mimic-year, but also increases computation time.",
+        default=4,
+    )
     args = parser.parse_args()
 
     rules = load_rules(args.rules, args.rule_lengths, min_conf=0.01, min_body_supp=2)
@@ -472,6 +482,7 @@ if __name__ == "__main__":
                 fact_dataset,
                 db_info,
                 8,
+                4,
                 parallel,
             )
 
