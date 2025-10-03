@@ -203,6 +203,7 @@ def prepare_queries(
     subj_facts: dict[str, list[Fact]],
     db_info: YagoDBInfo,
     max_queries: int,
+    non_exclusive_relations: set[str],
 ) -> list[Query]:
     """
     Given a relationship REL, randomly sample up to MAX_QUERIES
@@ -210,6 +211,7 @@ def prepare_queries(
     queries so that subject and relation are compatible according to
     YAGO schema, and that relation is coherent regarding its state on
     subject (e.g. you can't start a new job if you already have one).
+    NON_EXCLUSIVE_RELATIONS are excluded from the coherency logic.
     """
     subjects = list(subj_facts.keys())
 
@@ -221,7 +223,9 @@ def prepare_queries(
         subj = subjects[subj_i]
 
         if is_rel_allowed(subj, unlinearize_rel(rel), db_info):
-            if rel.startswith("start"):
+            if rel in non_exclusive_relations:
+                subject_candidates.append(subj)
+            elif rel.startswith("start"):
                 if not rel_is_active(rel, subj_facts[subj]):
                     subject_candidates.append(subj)
             elif rel.startswith("end"):
@@ -267,6 +271,7 @@ def sample_new_facts(
     db_info: YagoDBInfo,
     max_tries_nb: int,
     max_queries: int,
+    non_exclusive_relations: set[str],
     parallel: Parallel,
 ) -> list[Fact]:
     """Given a timestamp TS at the day level, attempt to generate
@@ -283,10 +288,13 @@ def sample_new_facts(
     :param db_info: in-memory representation of the YAGO database,
         used to filter new facts depending on whether thet respect
         database schema.  See :meth:`.YagoDBInfo.from_yago_dir`.
-    :param max_queries: Maximum number of queries for a sampled
-        relation.  passed to :func:`prepare_queries`
     :param max_tries_nb: max number of tries before giving up
         generating FACTS_PER_DAY facts.
+    :param max_queries: Maximum number of queries for a sampled
+        relation.  passed to :func:`prepare_queries`
+    :param non_exclusive_relations: relations not affected by the
+        close/open relation filtering logic.  passed to
+        :func:`prepare_queries`.
 
     :return: generated facts.
     """
@@ -313,7 +321,9 @@ def sample_new_facts(
         subj_facts = fact_dataset.subj_facts()  # { subject => [fact, ...]}
         queries = []
         for rel in relations:
-            rel_queries = prepare_queries(rel, subj_facts, db_info, max_queries)
+            rel_queries = prepare_queries(
+                rel, subj_facts, db_info, max_queries, non_exclusive_relations
+            )
             queries.append(rel_queries)
             for rel_query in rel_queries:
                 subj = rel_query[0]
@@ -421,6 +431,13 @@ if __name__ == "__main__":
         help="Maximum number of queries for a sampled relation. A higher number increases the chance to correctly mimic the relation distribution of the --mimic-year, but also increases computation time.",
         default=4,
     )
+    parser.add_argument(
+        "-n",
+        "--non-exclusive-relations",
+        default=set(),
+        nargs="*",
+        help="A list of relations that are considered non exclusive. By default, the generation algorithm considers a relation such as startWorksFor/endWorksFor as exclusive, meaning it wont generate a new startWorksFor event for entity A if the relation is not closed (i.e. A already works for B). This is desirable in many cases, but does not make sense for some relations (such as startAward/endAward).",
+    )
     args = parser.parse_args()
 
     rules = load_rules(args.rules, args.rule_lengths, min_conf=0.01, min_body_supp=2)
@@ -483,6 +500,7 @@ if __name__ == "__main__":
                 db_info,
                 8,
                 args.max_queries,
+                set(args.non_exclusive_relations),
                 parallel,
             )
 
