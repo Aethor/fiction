@@ -60,6 +60,8 @@ output/yago2026-facts.txt: output/yago4.5/r1,2,3_n200_exp_s12_rules.json
 		--year 2026\
 		--mimic-year 2022\
 		--process-nb 8\
+		--max-queries 4\
+		--non-exclusive-relations startAward startNotableWork startNeighbors startFounder startDoctoralAdvisor startPerformer startMusicBy startAppearsIn startConferredBy startCandidateIn\
 		--output-file "./output/yago2026-facts.txt"
 
 output/yago2022-facts.txt: data/yago4.5
