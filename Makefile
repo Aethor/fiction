@@ -37,6 +37,20 @@ output/yago4.5/r1,2,3_n200_exp_s12_rules.json: data/yago4.5
 		--seed 12\
 		--num_processes 1
 
+output/yago4.5/r1,2,3_n200_exp_s12_cands_r[1,2,3]_w2048_score_12[0.1,0.5].json: output/yago4.5/r1,2,3_n200_exp_s12_rules.json:
+	python -m fiction.tlogic.apply\
+		--dataset yago4.5\
+		--rules r1,2,3_n200_exp_s12_rules.json\
+		--rule_lengths 1 2 3\
+		--window 2048\
+		--num_processes 4
+
+.PHONY: evaluate_tlogic
+evaluate_tlogic: output/yago4.5/r1,2,3_n200_exp_s12_cands_r[1,2,3]_w2048_score_12[0.1,0.5].json
+	python -m fiction.tlogic.evaluate\
+		--dataset yago4.5\
+		--candidates r1,2,3_n200_exp_s12_cands_r[1,2,3]_w2048_score_12[0.1,0.5].json
+
 output/yago2026-facts.txt: output/yago4.5/r1,2,3_n200_exp_s12_rules.json
 	python -m fiction.gen_new_facts\
 		--rules ./output/yago4.5-small/r1,2,3_n200_exp_s12_rules.json\
