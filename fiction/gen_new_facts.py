@@ -482,7 +482,7 @@ if __name__ == "__main__":
                 fact_dataset,
                 db_info,
                 8,
-                4,
+                args.max_queries,
                 parallel,
             )
 
