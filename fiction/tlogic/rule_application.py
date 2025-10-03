@@ -333,8 +333,10 @@ def save_candidates(
     Returns:
         None
     """
-
-    all_candidates = {int(k): v for k, v in all_candidates.items()}
+    all_candidates = {
+        int(k): {ck: float(cv) for ck, cv in v.items()}
+        for k, v in all_candidates.items()
+    }
     for k in all_candidates:
         all_candidates[k] = {int(cand): v for cand, v in all_candidates[k].items()}
     filename = "{0}_cands_r{1}_w{2}_{3}.json".format(
