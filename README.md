@@ -98,6 +98,7 @@ python -m fiction.gen_new_facts\
        --year 2026\
        --mimic-year 2022\
        --process-nb 8\
+       --non-exclusive-relations startAward startNotableWork startNeighbors startFounder startDoctoralAdvisor startPerformer startMusicBy startAppearsIn startConferredBy startCandidateIn\
        --output-file "./output/yago2026-facts.txt"
 ```
 
