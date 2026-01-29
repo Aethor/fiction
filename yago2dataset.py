@@ -261,9 +261,10 @@ if __name__ == "__main__":
     # that ends after the start date of the earliest event from the
     # valid set (likewise for valid/train)
     facts = sorted(facts, key=lambda fact: Date(fact[3]))  # type: ignore
-    train = facts[: int(args.train_proportion * len(facts))]
-    valid = []  # we have no use for the validation dataset
-    test = facts[int(args.train_proportion * len(facts)) :]
+    train_facts_nb = int(args.train_proportion * len(facts))
+    train = facts[: train_facts_nb]
+    valid = [train_facts_nb:len(facts) - (len(facts) - train_facts_nb)//2]
+    test = facts[len(facts) - (len(facts) - train_facts_nb)//2:]
 
     dump_facts(
         train, args.output_dir / "train.txt", f"writing train.txt to {args.output_dir}"
