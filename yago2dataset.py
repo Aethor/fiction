@@ -262,9 +262,9 @@ if __name__ == "__main__":
     # valid set (likewise for valid/train)
     facts = sorted(facts, key=lambda fact: Date(fact[3]))  # type: ignore
     train_facts_nb = int(args.train_proportion * len(facts))
-    train = facts[: train_facts_nb]
-    valid = [train_facts_nb:len(facts) - (len(facts) - train_facts_nb)//2]
-    test = facts[len(facts) - (len(facts) - train_facts_nb)//2:]
+    train = facts[:train_facts_nb]
+    valid = facts[train_facts_nb : len(facts) - (len(facts) - train_facts_nb) // 2]
+    test = facts[len(facts) - (len(facts) - train_facts_nb) // 2 :]
 
     dump_facts(
         train, args.output_dir / "train.txt", f"writing train.txt to {args.output_dir}"
